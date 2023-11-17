@@ -1,6 +1,7 @@
 using BrenierTwoFluid
 using Test
+using Distances
 
 @testset "BrenierTwoFluid.jl" begin
-    # Write your tests here.
+    include("distancetests.jl")
 end
