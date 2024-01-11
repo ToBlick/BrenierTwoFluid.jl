@@ -1,16 +1,16 @@
-struct SinkhornVariable{T,d}
-    X::AbstractArray{T,d}
-    α::AbstractVector{T}
-    log_α::AbstractVector{T}
-    f::AbstractVector{T}
-    h::AbstractVector{T}
+struct SinkhornVariable{T, d, AT <: AbstractArray{T,d}, VT <: AbstractVector{T}}
+    X::AT
+    α::VT
+    log_α::VT
+    f::VT
+    h::VT
+end
 
-    function SinkhornVariable(X::AbstractArray{T,d}, α::AbstractVector{T}) where {T, d}
-        log_α = log.(α)
-        f = zero(α)
-        h = zero(α)
-        new{T,d}(X,α,log_α,f,h)
-    end
+function SinkhornVariable(X::AT, α::VT) where {T, d, AT <: AbstractArray{T,d}, VT <: AbstractVector{T}}
+    log_α = log.(α)
+    f = zero(α)
+    h = zero(α)
+    SinkhornVariable(X,α,log_α,f,h)
 end
 
 positions(V::SinkhornVariable) = V.X

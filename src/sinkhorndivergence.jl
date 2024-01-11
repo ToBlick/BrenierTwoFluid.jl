@@ -1,41 +1,63 @@
-struct SinkhornDivergence{T,d}
-    V1::SinkhornVariable{T,d}  #X,α,log(α),f,h₁
-    V2::SinkhornVariable{T,d}  #Y,β,log(β),g,h₂
-    CC::CostCollection{T}       #C_xy,C_yx,C_xx,C_yy
-
-    f₋::AbstractVector{T}
-    g₋::AbstractVector{T}
-    
+mutable struct SinkhornParameters{T, SAFE}
     Δ::T #diameter
     q::T #scaling parameter
-    s::Vector{T} #current scale
+    s::T #current scale
     ε::T #minimum scale
     p::T #ε ∼ x^p
+    tol::T #tolerance
+    maxit::Int
 
-    function SinkhornDivergence(V1::SinkhornVariable{T,d}, 
-                                V2::SinkhornVariable{T,d}, 
-                                CC::CostCollection{CT};
-                                Δ = maximum(CC.C_xy),
-                                q = 0.9,
-                                ε = maximum(CC.C_xy) * 1e-3,
-                                p = 2) where {T,d,CT}
-        new{T,d}(V1,V2,CC,zero(V1.f),zero(V2.f),Δ,q,[Δ],ε,p)
+    function SinkhornParameters(Δ::T, q::T, s::T, ε::T, p::T, tol::T, maxit) where {T}
+        if tol == Inf
+            SAFE = false
+        else
+            SAFE = true
+        end
+        new{T, SAFE}(Δ, q, s, ε, p, tol, maxit)
     end
 end
 
-scale(S::SinkhornDivergence) = S.s[1] 
-
-function SinkhornDivergence(X::AbstractArray{T,d},α::AbstractVector{T},
-                            Y::AbstractArray{T,d},β::AbstractVector{T},
-                            CC::CostCollection{CT};
-                            Δ = maximum(CC.C_xy),
-                            q = 0.9,
-                            ε = maximum(CC.C_xy) * 1e-2,
-                            p = 2) where {T,d,CT}
-    SinkhornDivergence(SinkhornVariable(X,α),SinkhornVariable(Y,β),CC,Δ,q,ε,p)
+struct SinkhornDivergence{T, d, AT, VT, CT, PT <: SinkhornParameters{T}}
+    V1::SinkhornVariable{T,d,AT,VT} #X,α,log(α),f,h₁
+    V2::SinkhornVariable{T,d,AT,VT} #Y,β,log(β),g,h₂
+    CC::CostCollection{T,CT}       #C_xy,C_yx,C_xx,C_yy
+    params::PT
+    f₋::VT
+    g₋::VT
 end
 
-function softmin(j, C::AbstractMatrix, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::T) where T
+issafe(SP::SinkhornParameters{T, SAFE}) where {T,SAFE} = SAFE
+
+function SinkhornDivergence(V1::SinkhornVariable{T,d,AT,VT}, 
+                            V2::SinkhornVariable{T,d,AT,VT}, 
+                            CC::CostCollection{T,CT};
+                            Δ = maximum(CC.C_xy),
+                            q = 0.9,
+                            ε = maximum(CC.C_xy) * 1e-3,
+                            p = 2.0,
+                            tol = Inf,
+                            maxit = Int(ceil(Δ/ε))) where {T,d,AT <: AbstractArray{T,d},VT <: AbstractVector{T},CT}
+                            SinkhornDivergence(V1,V2,CC,SinkhornParameters(Δ,q,Δ,ε,p,tol,maxit),zero(V1.f),zero(V2.f))
+end
+
+scale(S::SinkhornDivergence) = S.params.s
+maxit(S::SinkhornDivergence) = S.params.maxit
+tol(S::SinkhornDivergence) = S.params.tol
+minscale(S::SinkhornDivergence) = S.params.ε
+
+function SinkhornDivergence(X::AT,α::VT,
+                            Y::AT,β::VT,
+                            CC::CostCollection{T,CT};
+                            Δ = maximum(CC.C_xy),
+                            q = 0.9,
+                            ε = maximum(CC.C_xy) * 1e-3,
+                            p = 2.0,
+                            tol = Inf,
+                            maxit = Int(ceil(Δ/ε))) where {T,d,AT <: AbstractArray{T,d},VT <: AbstractVector{T},CT}
+    SinkhornDivergence(SinkhornVariable(X,α),SinkhornVariable(Y,β),CC,SinkhornParameters(Δ,q,Δ,ε,p,tol,maxit),zero(V1.f),zero(V2.f))
+end
+
+function softmin(j, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::T) where T
     M = -Inf
     r = 0.0
     @inbounds for i in eachindex(f)
@@ -48,7 +70,7 @@ function softmin(j, C::AbstractMatrix, f::AbstractVector{T}, log_α::AbstractVec
             M = v
         end
     end
-    (- ε * (log(r) + M))::T
+    (- ε * (log(r) + M))
 end
 
 function sinkhorn_step!(S::SinkhornDivergence{T}) where T
@@ -60,15 +82,46 @@ function sinkhorn_step!(S::SinkhornDivergence{T}) where T
         S.V2.f[j] = 1/2 * S.g₋[j] + 1/2 * softmin(j, S.CC.C_xy, S.f₋, S.V1.log_α, scale(S))
         S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h, S.V2.log_α, scale(S))
     end
-    S.f₋ .= S.V1.f
-    S.g₋ .= S.V2.f
+    #=
+    @inbounds for i in eachindex(S.V1.f)
+        S.V1.f[i] = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
+        S.V1.h[i] = 1/2 * S.V1.h[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h, S.V1.log_α, scale(S))
+    end
+    @inbounds for j in eachindex(S.V2.f)
+        S.V2.f[j] = softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S))
+        S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h, S.V2.log_α, scale(S))
+    end
+    =#
+end
+
+function sinkhorn_step!(f, f₋, g₋, h, log_α, log_β, C_yx, C_xx, ε) where T
+    @inbounds for i in eachindex(f)
+        f[i] = 1/2 * f₋[i] + 1/2 * softmin(i, C_yx, g₋, log_β, ε)
+        h[i] = 1/2 * h[i] + 1/2 * softmin(i, C_xx, h, log_α, ε)
+    end
 end
 
 function compute!(S::SinkhornDivergence)
-    while scale(S) > S.ε
-        sinkhorn_step!(S)
-        S.s[1] = scale(S) * S.q
+    if !issafe(S.params)
+        while scale(S) >= minscale(S)
+            sinkhorn_step!(S)
+            S.f₋ .= S.V1.f
+            S.g₋ .= S.V2.f
+            S.params.s = scale(S) * S.params.q
+        end
+    else
+        it = 0
+        while it < maxit(S)
+            sinkhorn_step!(S)
+            if norm(S.f₋ - S.V1.f, 1)/norm(S.f₋,1) + norm(S.g₋ - S.V2.f, 1)/norm(S.g₋,1) < tol(S)
+                break
+            end
+            S.f₋ .= S.V1.f
+            S.g₋ .= S.V2.f
+            S.params.s = maximum((scale(S) * S.params.q, minscale(S)))
+        end
     end
+    value(S)
 end
 
 function value(S::SinkhornDivergence)
@@ -86,24 +139,16 @@ function x_gradient!(∇S, S::SinkhornDivergence{T,d}, ∇c) where {T,d}
     β = S.V2.α
     α = S.V1.α
     ε = scale(S)
-    ∇Wαβ_i = zero(∇S[begin,:])
-    ∇Wαα_i = zero(∇S[begin,:])
+    ∇S .= 0
     for i in eachindex(f)
-        ∇Wαβ_i .= 0
-        denom_αβ = 0
         for j in eachindex(g)
             v = exp((g[j] + f[i] - C_xy[i,j])/ε) * β[j]
-            ∇Wαβ_i .+= v .* ∇c(X[i,:],Y[j,:])
-            denom_αβ += v
+            ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:]) .* α[i]
         end
-        ∇Wαα_i .= 0
-        denom_αα = 0
         for k in eachindex(h)
             v = exp((h[k] + h[i] - C_xx[i,k])/ε) * α[k]
-            ∇Wαα_i .+= v .* ∇c(X[i,:],X[k,:])
-            denom_αα += v
+            ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:]) .* α[i]
         end
-        ∇S[i,:] .= (∇Wαβ_i ./ denom_αβ .- ∇Wαα_i ./ denom_αα) .* α[i]
     end
     ∇S
 end
@@ -114,87 +159,33 @@ function x_gradient(S::SinkhornDivergence, ∇c)
     ∇S
 end
 
-
-function SinkhornDivergence(X, α,
-                            Y, β,
-                            c,
-                            f, g, h_x, h_y,
-                            Δ = 1,
-                            σ = 1e-2,
-                            q = 0.9)
-
-    log_α = log.(α)
-    log_β = log.(β)
-
-    C_xy = LazyCost(X, Y, c)
-    C_yx = LazyCost(Y, X, c)
-    C_xx = LazyCost(X, X, c)
-    C_yy = LazyCost(Y, Y, c)
-
-    if Δ == 1
-        f = C_xy * β
-        g = C_yx * α
-
-        h_x = C_xx * α
-        h_y = C_yy * β
-    end
-
-    f₋ = copy(f)
-    g₋ = copy(g)
-
-    s = Δ
-
-    while s > σ
-        ε = s^2
-
-        f₋ .= f
-        g₋ .= g
-
+function y_gradient!(∇S, S::SinkhornDivergence{T,d}, ∇c) where {T,d}
+    C_yx = S.CC.C_yx
+    C_yy = S.CC.C_yy
+    X = S.V1.X
+    Y = S.V2.X
+    g = S.V2.f
+    f = S.V1.f
+    h = S.V2.h
+    β = S.V2.α
+    α = S.V1.α
+    ε = scale(S)
+    ∇S .= 0
+    for j in eachindex(g)
         for i in eachindex(f)
-            f[i] = 1/2 * f₋[i] + 1/2 * softmin(i, g₋, C_yx, log_β, ε)
-            h_x[i] = 1/2 * h_x[i] + 1/2 * softmin(i, h_x, C_xx, log_α, ε)
+            v = exp((g[j] + f[i] - C_yx[j,i])/ε) * α[i]
+            ∇S[j,:] .+= v .* ∇c(Y[j,:],X[i,:]) .* β[j]
         end
-        for j in eachindex(g)
-            g[j] = 1/2 * g₋[j] + 1/2 * softmin(j, f₋, C_xy, log_α, ε)
-            h_y[j] = 1/2 * h_y[j] + 1/2 * softmin(j, h_y, C_yy, log_β, ε)
+        for k in eachindex(h)
+            v = exp((h[k] + h[j] - C_yy[j,k])/ε) * β[k]
+            ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:]) .* β[j]
         end
-
-        s *= q
     end
-
-    ε = s^2
-    S_ε = (f - h_x)' * α + (g - h_y)' * β
-
-    grad_x = zero(X)
-    for i in eachindex(f)
-        nom1 = zero(X[1,:])
-        denom1 = 0
-        nom2 = zero(X[1,:])
-        denom2 = 0
-
-        gvals = [ g[j] - C_xy[i,j] for j in eachindex(g) ]
-        mg = maximum(gvals)
-        for j in eachindex(g)
-            nom1 += exp((g[j] - C_xy[i,j] - mg)/ε) * (X[i,:] - Y[j,:])
-            denom1 += exp((g[j] - C_xy[i,j] - mg)/ε)
-        end
-        hvals = [ h_x[k] - C_xx[i,k] for k in eachindex(f) ]
-        mh = maximum(hvals)
-        for k in eachindex(f)
-            nom2 += exp((h_x[k] - C_xx[i,k] -mh )/ε) * (X[i,:] - X[k,:])
-            denom2 += exp((h_x[k] - C_xx[i,k] -mh)/ε)
-        end
-        grad_x[i,:] .= nom1/denom1 - nom2/denom2
-    end
-
-    # π_αβ = [ α[i] * β[j] * exp((f[i] + g[j] - C_xy[i,j]) / ε) for i in eachindex(α), j in eachindex(β) ]
-
-    return (f = f, 
-            g = g, 
-            h_x = h_x, 
-            h_y = h_y, 
-            ε = ε, 
-            S_ε = S_ε,
-            grad_x = grad_x)
+    ∇S
 end
 
+function y_gradient(S::SinkhornDivergence, ∇c)
+    ∇S = zero(S.V1.X)
+    y_gradient!(∇S, S, ∇c)
+    ∇S
+end

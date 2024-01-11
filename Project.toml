@@ -3,6 +3,18 @@ uuid = "698bc5df-bacc-4e45-9592-41ae9e406d75"
 authors = ["Tobias Blickhan <tobias.blickhan@gmail.com> and contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+ApproxFun = "28f2ccd6-bb30-5033-b560-165f7b14dc2f"
+Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LatinHypercubeSampling = "a5e1c1ea-c99a-51d3-a14d-a9a37257b02d"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+Sobol = "ed01d8cd-4d21-5b2a-85b4-cc3bdc58bad4"
+
 [compat]
 julia = "1"
 

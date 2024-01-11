@@ -1,30 +1,92 @@
 using Distances
 using Plots
 using LatinHypercubeSampling
+using Sobol
 using BrenierTwoFluid
+using LinearAlgebra
+using Random
+using LaTeXStrings
 
-const N = 16^2
-const M = 16^2
-const d = 2
-gens = 1000
+d = 2
+
+function c_periodic(x::VT,y::VT,D) where {T,VT <: AbstractVector{T}}
+    d = 0
+    for i in eachindex(x)
+        if x[i] - y[i] > D[i]/2
+            d += (x[i] - y[i] - D[i])^2
+        elseif x[i] - y[i] < -D[i]/2
+            d += (x[i] - y[i] + D[i])^2
+        else
+            d += (x[i] - y[i])^2
+        end
+    end
+    0.5 * d
+end
+
+function ∇c_periodic(x,y,D)
+    ∇c = zero(x)
+    for i in eachindex(x)
+        if x[i] - y[i] > D[i]/2
+            ∇c[i] = x[i] - y[i] - D[i]
+        elseif x[i] - y[i] < -D[i]/2
+            ∇c[i] = (x[i] - y[i] + D[i])
+        else
+            ∇c[i] = x[i] - y[i]
+        end
+    end
+    ∇c
+end
 
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
+#D = 1*ones(2);
+#c = (x,y) -> c_periodic(x,y,D)
+#∇c = (x,y) -> ∇c_periodic(x,y,D)
+
+δ = 5e-2
+
+N = 30^2 # Int(ceil(δ^(-3/4*d)))
+M = N
+d′ = 2*floor(d/2)
+ε = δ^2 #N^(-1/(d′+4))
+sqrt(ε)
+
+K₀ = 0.25
+
+Δt = 1/50
+λ = 2*K₀/δ^2 # Δt^(-2) # N^(d/2) * N
+
+ε^-1 * N^(-1/2) * log(N)
+
+t = 0
+
+q = 0.8
+Δ = 1.0
 
 α = ones(N) / N
 β = ones(M) / M
 
-@time plan, _ = LHCoptim(N+M,2,gens);
-scaled_plan = scaleLHC(plan,[(-0.5,0.5),(-0.5,0.5)])
-X = scaled_plan[1:N,:]
-Y = scaled_plan[N+1:end,:];
+#=
+r = sqrt.(rand(N))
+θ = rand(N) * 2π
+X = hcat( r.*cos.(θ), r.*sin.(θ) ) .* 0.5
+
+r = sqrt.(rand(M))
+θ = rand(M) * 2π
+Y = hcat( r.*cos.(θ), r.*sin.(θ) ) .* 0.5
+=#
+Random.seed!(123)
+
+X = rand(N,d) .- 0.5;
+Y = rand(M,d) .- 0.5;
 
 #uniform grid
 for k in 1:Int(sqrt(M))
     for l in 1:Int(sqrt(M))
-        Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))+1), l/(Int(sqrt(M))+1) ] .- 1/2
+        Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
     end
 end
+X .= Y .+ rand(N,d) * sqrt(ε) .- sqrt(ε)/2
 
 scatter(X[:,1], X[:,2], label = false, color = :blue)
 scatter!(Y[:,1], Y[:,2], label = false, color = :red)
@@ -32,16 +94,33 @@ scatter!(Y[:,1], Y[:,2], label = false, color = :red)
 X .= X[sortperm(X[:,1]), :]
 Y .= Y[sortperm(Y[:,1]), :];
 
-u0(x) =(-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2]))
+u0(x) = [-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2])]
 V = zero(X)
 for i in axes(X)[1]
     V[i,:] .= u0(X[i,:])
 end
 
+norm(V)^2/2/N
+
+p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
+∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
+
 solX = []
 solV = []
+solD = []
+sol∇S = []
+
+CC = CostCollection(X, Y, c)
+V1 = SinkhornVariable(X,α)
+V2 = SinkhornVariable(Y,β)
+S = SinkhornDivergence(V1,V2,CC; ε=ε, q=q, Δ=Δ, tol=1e-3)
+∇S = zero(X)
+initialize_potentials!(S.V1,S.V2,S.CC)
+@time compute!(S)
 push!(solX, copy(X))
-push!(solV, copy(V));
+push!(solV, copy(V))
+push!(solD, value(S))
+push!(sol∇S, copy(x_gradient!(∇S, S, ∇c)))
 
 j = 1
 plt = scatter(solX[j][1:div(N,3),1], solX[j][1:div(N,3),2], label = false, color = :blue)
@@ -50,33 +129,58 @@ scatter!(solX[j][div(2N,3)+1:end,1], solX[j][div(2N,3)+1:end,2], label = false, 
 scatter!(Y[:,1],Y[:,2], label = false, color = :black, markersize=1)
 plt
 
-ε = 1/N^(2/d)
-λ = N^(d/2)
-t = 0
-Δt = 0.5 / λ
-q = 0.9
+@time while t < 1.0
 
-CC = CostCollection(X, Y, c)
-V1 = SinkhornVariable(X,α)
-V2 = SinkhornVariable(Y,β)
-initialize_potentials!(V1,V2,CC)
-S = SinkhornDivergence(V1,V2,CC;ε=ε,q=q);
-∇S = zero(X);
+    X .+= 0.5 * Δt * V
+    
+    #=for i in axes(X,1)
+        for j in axes(X,2)
+            if X[i,j] > 0.5
+                X[i,j] -= D[j]
+            elseif X[i,j] < -0.5
+                X[i,j] += D[j]
+            end
+        end
+    end=#
 
-@time while t < 0.5
-
-    X .+= Δt * V
-
-    S.s[1] = ε / q^3
+    S.params.s = Δ
+    initialize_potentials!(V1,V2,CC)
     compute!(S)
     x_gradient!(∇S, S, ∇c)
+    push!(solD, value(S))
+    push!(sol∇S, copy(∇S))
     V .-= Δt * λ .* ∇S ./ α
+    
+    #for i in axes(X,1)
+    #    V[i,:] .-= Δt * ∇p(X[i,:])
+    #end
+
+    X .+= 0.5 * Δt * V
+    
+    #=for i in axes(X,1)
+        for j in axes(X,2)
+            if X[i,j] > 0.5
+                X[i,j] -= D[j]
+            elseif X[i,j] < -0.5
+                X[i,j] += D[j]
+            end
+        end
+    end=#
 
     push!(solX, copy(X))
     push!(solV, copy(V))
+    #push!(solD, value(S))
 
     t += Δt
+    #Y .= rand(M,d) .- 0.5;
 end
+
+solK = [norm(V)^2 for V in solV]/2/N;
+
+solK
+
+plot(solK .- solK[1], linewidth=2, label=L"\frac{1}{2} \sum_i V_i^2(t) - \frac{1}{2} \sum_i V_i^2(0)", legend = :bottomright)
+plot!(λ/2/N * (solD .- solD[1]), linewidth=2, label=L"\frac{\lambda}{2} S_\varepsilon(t) - \frac{\lambda}{2} S_\varepsilon(0)")
 
 T = length(solX)
 j = T
@@ -84,9 +188,37 @@ plt = scatter(solX[j][1:div(N,3),1], solX[j][1:div(N,3),2], label = false, color
 scatter!(solX[j][div(N,3)+1:div(2N,3),1], solX[j][div(N,3)+1:div(2N,3),2], label = false, color = :green)
 scatter!(solX[j][div(2N,3)+1:end,1], solX[j][div(2N,3)+1:end,2], label = false, color = :red)
 
+Π = TransportPlan(S);
+sum(Matrix(Π))
+
+f(x,y) = cos(π*x) * cos(π*y);
+
+F = [ f(solX[1][i,1],solX[1][i,2]) for i in 1:N ];
+
+anim = @animate for i in 1:T
+    scatter(solX[i][:,1], solX[i][:,2]; label = false, zcolor = F, color=:seismic,
+    ylim = (-0.6,0.6), xlim = (-0.6,0.6))
+end
+gif(anim, "anim_fps10.gif", fps = 10)
+
+scatter(solX[end][:,1], solX[end][:,2]; label = false, zcolor = F, color=:seismic,
+    ylim = (-0.6,0.6), xlim = (-0.6,0.6), size = (1000,1000), colorbar = false)
+
+quiver!(X[:,1],X[:,2],quiver= -Δt * λ .* (sol∇S[end][:,1] ,sol∇S[end][:,2] ),
+        alpha = 0.5, color = :red, size = (1000,1000))
+quiver!(X[:,1],X[:,2],quiver= -Δt .* ([∇p(X[i,:])[1] for i in axes(X,1)], [∇p(X[i,:])[2] for i in axes(X,1)]),
+        alpha = 0.5, color = :blue)
+#scatter!(X[:,1],X[:,2],color=:black,legend = false, markersize = 1)
+#scatter!(Y[:,1],Y[:,2],color=:blue)
+
+savefig("pressure.pdf")
+
+Statistics.median(λ .* [norm(sol∇S[end][i,:]) for i in axes(X,1)])
+
+Statistics.median([norm(∇p(X[i,:])) for i in axes(X,1)])
 
 
-
+1
 
 
 #=
@@ -109,7 +241,7 @@ for i in eachindex(α), j in eachindex(β)
     plot!([X[i,1], Y[j,1]], [X[i,2], Y[j,2]], alpha=sqrt(N*M)*sol.plan[i,j],legend=:false, color = :black, grid = false, size = (800,800))
 end
 plt
-=#
+
 
 """
 Potential is equal to S_ε(α, unif) = S_ε( ∑_i α_i δx_i,  ∑_j β_j δy_j ), hence 
@@ -140,8 +272,10 @@ end
 
 solX = []
 solV = []
+solD = []
 push!(solX, copy(X))
 push!(solV, copy(V))
+push!(solD, 0.0)
 
 j = 1
 plt = scatter(solX[j][1:div(N,3),1], solX[j][1:div(N,3),2], label = false, color = :blue)
@@ -172,7 +306,7 @@ h_y = zero(β)
 
     push!(solX, copy(X))
     push!(solV, copy(V))
-
+    push!(solD, value(dist))
     f .= dist.f
     g .= dist.g
     h_x .= dist.h_x
@@ -260,4 +394,5 @@ sol1.grad_x
     scatter!(Y[:,1], Y[:,2], color = :blue)
     plt
 
+=#
 =#

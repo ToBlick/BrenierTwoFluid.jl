@@ -10,7 +10,7 @@ function Plots.plot(Π::TransportPlan{T,2}) where {T}
     scatter!(Y[:,1],Y[:,2],label = L"β",color = :blue)
     C = sum(Matrix(Π))
     for i in eachindex(α), j in eachindex(β)
-        v = sqrt(N*M)*Matrix(Π)[i,j] / C
+        v = sqrt(N*M)*Matrix(Π)[i,j]/C
         if v > 1e-2
             plot!([X[i,1], Y[j,1]], [X[i,2], Y[j,2]], 
                 alpha=v,
