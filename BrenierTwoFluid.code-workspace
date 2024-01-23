@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../OptimalMappings"
+		},
+		{
+			"path": "../WassersteinDictionaries.jl"
+		}
+	],
+	"settings": {
+		"julia.environmentPath": "/Users/tobias/Coding/BrenierTwoFluid"
+	}
+}
