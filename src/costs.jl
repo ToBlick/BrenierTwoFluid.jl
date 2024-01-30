@@ -40,3 +40,31 @@ struct CostCollection{T, CT <: AbstractMatrix{T}}
         new{T,ct}(LazyCost(X,Y,c),LazyCost(Y,X,c),LazyCost(X,X,c),LazyCost(Y,Y,c))
     end
 end
+
+function c_periodic(x::VT,y::VT,D) where {T,VT <: AbstractVector{T}}
+    d = 0
+    for i in eachindex(x)
+        if x[i] - y[i] > D[i]/2
+            d += (x[i] - y[i] - D[i])^2
+        elseif x[i] - y[i] < -D[i]/2
+            d += (x[i] - y[i] + D[i])^2
+        else
+            d += (x[i] - y[i])^2
+        end
+    end
+    0.5 * d
+end
+
+function ∇c_periodic(x,y,D)
+    ∇c = zero(x)
+    for i in eachindex(x)
+        if x[i] - y[i] > D[i]/2
+            ∇c[i] = x[i] - y[i] - D[i]
+        elseif x[i] - y[i] < -D[i]/2
+            ∇c[i] = (x[i] - y[i] + D[i])
+        else
+            ∇c[i] = x[i] - y[i]
+        end
+    end
+    ∇c
+end

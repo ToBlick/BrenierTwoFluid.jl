@@ -125,6 +125,7 @@ function sinkhorn_step!(S::SinkhornDivergence{T}) where T
         @inbounds for j in eachindex(S.V2.f)
             S.V2.f[j] = 1/2 * S.g₋[j] + 1/2 * softmin(j, S.CC.C_xy, S.f₋, S.V1.log_α, scale(S))
             S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h, S.V2.log_α, scale(S))
+            # no acceleration is done for the symmetric problem
             if isaccelerated(S.params)
                 S.V2.f[j] = (1 - acceleration(S)) * S.g₋[j] + acceleration(S) * S.V2.f[j]
             end
@@ -159,7 +160,7 @@ end
 =#
 
 function compute!(S::SinkhornDivergence)
-    it = 0
+    it = 1
     r_p = 0
     #trace = []
     if !issafe(S.params)
@@ -190,18 +191,21 @@ function compute!(S::SinkhornDivergence)
             it += 1
         end
     else
-        while it < maxit(S)
+        while it <= maxit(S)
             sinkhorn_step!(S)
             # tolerance criterion: relative change of potentials
             #if norm(S.f₋ - S.V1.f, 1)/norm(S.f₋,1) + norm(S.g₋ - S.V2.f, 1)/norm(S.g₋,1) < tol(S)
             #    break
             #end
-            # tolerance criterion: marginal violation
-            π1_err, π2_err = marginal_errors(S)
-            #push!(trace, [π1_err, π2_err, value(S)])
-            #println("marginal errors: $π1_err and $π2_err at scale ε = $(scale(S)).")
-            if π1_err + π2_err < 2*tol(S)
-                break
+            if it % 5 == 0
+                # tolerance criterion: marginal violation
+                #π1_err, π2_err = marginal_errors(S)
+                π2_err = marginal_error(S)
+                #push!(trace, [π1_err, π2_err, value(S)])
+                #println("marginal errors: $π1_err and $π2_err at scale ε = $(scale(S)).")
+                if π2_err < tol(S)
+                    break
+                end
             end
             if issymmetric(S.params)
                 S.f₋ .= S.V1.f
@@ -215,8 +219,9 @@ function compute!(S::SinkhornDivergence)
 
             # calculate ω
             if it == S.params.crit_it - S.params.p_ω
-                r_p = π2_err
+                r_p = marginal_error(S)
             elseif it == S.params.crit_it
+                π2_err = marginal_error(S)
                 θ²_est = (π2_err/r_p)^(1/S.params.p_ω)
                 S.params.ω = Real(2 / (1 + sqrt(1 - θ²_est)))
             end
@@ -225,7 +230,7 @@ function compute!(S::SinkhornDivergence)
         end
     end
     #println("iterations: $it.")
-    return value(S) #(value(S), trace)
+    return value(S)
 end
 
 function marginal_errors(S::SinkhornDivergence)
@@ -240,6 +245,15 @@ function marginal_errors(S::SinkhornDivergence)
         π1_err += abs( exp( (S.V2.f[j] - sm_j) / scale(S) ) - 1 ) * S.V2.α[j]
     end
     return π1_err, π2_err
+end
+
+function marginal_error(S::SinkhornDivergence)
+    π2_err = 0
+    @inbounds for i in eachindex(S.V1.f)
+        sm_i = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
+        π2_err += abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 ) * S.V1.α[i]
+    end
+    return π2_err
 end
 
 function value(S::SinkhornDivergence)
@@ -290,10 +304,12 @@ function y_gradient!(∇S, S::SinkhornDivergence{T,d}, ∇c) where {T,d}
     ε = scale(S)
     ∇S .= 0
     for j in eachindex(g)
+        # W(α,β) - term
         for i in eachindex(f)
             v = exp((g[j] + f[i] - C_yx[j,i])/ε) * α[i]
             ∇S[j,:] .+= v .* ∇c(Y[j,:],X[i,:]) .* β[j]
         end
+        # W(β,β) - term
         for k in eachindex(h)
             v = exp((h[k] + h[j] - C_yy[j,k])/ε) * β[k]
             ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:]) .* β[j]
