@@ -36,3 +36,5 @@ notebooks/
 
 # Figures
 figs/
+*.pdf
+runs/

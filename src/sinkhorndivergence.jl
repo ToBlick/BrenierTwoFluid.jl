@@ -32,7 +32,7 @@ function SinkhornParameters(CC::CostCollection;
                             ε = maximum(CC.C_xy) * 1e-3,
                             s = ε,
                             p = 2.0,
-                            tol = 1e-3,
+                            tol = 1e-6,
                             maxit = Int(ceil(Δ/ε)),
                             sym = false,
                             acc = true)
@@ -234,8 +234,8 @@ function compute!(S::SinkhornDivergence)
 end
 
 function marginal_errors(S::SinkhornDivergence)
-    π1_err = 0
-    π2_err = 0
+    π1_err = 0.0
+    π2_err = 0.0
     @inbounds for i in eachindex(S.V1.f)
         sm_i = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
         π2_err += abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 ) * S.V1.α[i]
@@ -248,7 +248,7 @@ function marginal_errors(S::SinkhornDivergence)
 end
 
 function marginal_error(S::SinkhornDivergence)
-    π2_err = 0
+    π2_err = 0.0
     @inbounds for i in eachindex(S.V1.f)
         sm_i = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
         π2_err += abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 ) * S.V1.α[i]

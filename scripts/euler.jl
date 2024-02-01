@@ -4,52 +4,42 @@ using Plots
 using LinearAlgebra
 using Random
 using LaTeXStrings
-
+using ProgressBars
+using HDF5
+using Dates
 
 Random.seed!(123)
 
 d = 2
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
-#D = 1*ones(2);
-#c = (x,y) -> c_periodic(x,y,D)
-#∇c = (x,y) -> ∇c_periodic(x,y,D)
 
-N = 30^2                  # particle number
-M = N
 d′ = 2*floor(d/2)
-ε = 0.01 * N^(-1/(d′+4))  # entropic regularization parameter
-sqrt(ε)
+δ = 0.05  # spatial tolerance 
+ε = δ^2 #0.01 * N^(-1/(d′+4))  # entropic regularization parameter
 
-δ = 0.03                  # spatial tolerance 
-K₀ = 0.25                 # initial kinetic energy
-Δt = 1/25                 # time-step
-λ = 3*K₀/δ^2              # relaxation to enforce dist < δ
+N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
+M = Int((ceil(N^(1/d′))^d′))
 
-t = 0  
-q = 1.0     # ε-scaling rate
-Δ = 1.0     # characteristic domain size
-s = ε       # initial scale (ε)
-tol = 1e-3  # tolerance on marginals (absolute)
-crit_it = 5 # when to compute acceleration
-p_ω = 2     # acceleration heuristic
-
-T = 2.0     # final time
-nt = Int(ceil((T-t)/Δt))
+q = 1.0         # ε-scaling rate
+Δ = 1.0         # characteristic domain size
+s = ε           # initial scale (ε)
+tol = 1e-1 * δ      # tolerance on marginals (absolute)
+crit_it = Int(ceil(0.05 * Δ / ε))    # when to compute acceleration
+p_ω = 2         # acceleration heuristic
 
 # initial conditions - identical
 α = ones(N) / N
 β = ones(M) / M
 X = rand(N,d) .- 0.5;
 Y = rand(M,d) .- 0.5;
-
 #  uniform grid for background density
 for k in 1:Int(sqrt(M))
     for l in 1:Int(sqrt(M))
         Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
     end
 end
-#X .= Y .+ randn(N,d) * δ .- δ/2   # wiggle by δ
+#X .= Y .+ rand(N,d) * δ .- δ/2   # wiggle by δ
 X .= X[sortperm(X[:,1]), :]
 Y .= Y[sortperm(Y[:,1]), :];
 
@@ -60,14 +50,7 @@ for i in axes(X)[1]
     V[i,:] .= u0(X[i,:])
 end
 
-p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
-∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
-
-solX = [ zero(X) for i in 1:(nt + 1) ]
-solV = [ zero(V) for i in 1:(nt + 1) ]
-solD = [ 0.0 for i in 1:(nt + 1) ]
-sol∇S = [ zero(X) for i in 1:(nt + 1) ]
-
+# calculate initial distance
 # Setup Sinkhorn
 CC = CostCollection(X, Y, c)
 V1 = SinkhornVariable(X, α)
@@ -78,6 +61,28 @@ S = SinkhornDivergence(V1,V2,CC,params)
 ∇S = zero(X)
 initialize_potentials!(S.V1,S.V2,S.CC)
 @time valS = compute!(S)
+δ^2
+@assert δ^2 > valS
+
+K₀ = 0.5 * dot(V,diagm(α) * V) #0.25    # initial kinetic energy
+λ² = 2*K₀/(δ^2 - valS)                  # relaxation to enforce dist < δ
+
+Δt = 1/25                               # time-step               
+t = 0
+
+Δt * √(λ²) * √2
+
+T = 1.0     # final time
+nt = Int(ceil((T-t)/Δt))
+
+p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
+∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
+
+solX = [ zero(X) for i in 1:(nt + 1) ]
+solV = [ zero(V) for i in 1:(nt + 1) ]
+solD = [ 0.0 for i in 1:(nt + 1) ]
+sol∇S = [ zero(X) for i in 1:(nt + 1) ]
+
 solX[1] = copy(X)
 solV[1] = copy(V)
 solD[1] = value(S)
@@ -92,40 +97,26 @@ scatter!(Y[:,1],Y[:,2], label = false, color = :black, markersize=1)
 plt
 
 # integrate
-@time for it in 1:nt
+_, time = @timed for it in ProgressBar(1:nt)
 
     X .+= 0.5 * Δt * V
-    
-    begin
-    #=
-    # handle periodic BC TODO move this to own fct
-    for i in axes(X,1)
-        for j in axes(X,2)
-            if X[i,j] > 0.5
-                X[i,j] -= D[j]
-            elseif X[i,j] < -0.5
-                X[i,j] += D[j]
-            end
-        end
-    end
-    =#
-    end
 
     S.params.s = s  # if scaling is used it should be reset here
-    #initialize_potentials!(V1,V2,CC)
-    #compute!(S)
-    #x_gradient!(∇S, S, ∇c)
+    initialize_potentials!(V1,V2,CC)
+    compute!(S)
+    x_gradient!(∇S, S, ∇c)
 
-    #V .-= Δt .* λ .* ∇S ./ α
-    for i in axes(V,1)
-        V[i,:] .-= Δt * ∇p(X[i,:])
-    end
+    V .-= Δt .* λ² .* ∇S ./ α
+    # exact dynamics
+    #for i in axes(V,1)
+    #    V[i,:] .-= Δt * ∇p(X[i,:])
+    #end
 
     X .+= 0.5 .* Δt .* V
 
     # diagnostics
-    initialize_potentials!(V1,V2,CC)
-    compute!(S)
+    #initialize_potentials!(V1,V2,CC)
+    #compute!(S)
     solX[1+it] = copy(X)
     solV[1+it] = copy(V)
     solD[1+it] = value(S)
@@ -133,22 +124,41 @@ plt
     #Y .= rand(M,d) .- 0.5;
 end
 
+results = "runs/results.hdf5"
+fid = h5open(results, "w")
+fid["X"] = [ solX[i][j,k] for i in eachindex(solX), j in axes(X,1), k in axes(X,2) ];
+fid["V"] = [ solV[i][j,k] for i in eachindex(solV), j in axes(V,1), k in axes(V,2) ];
+fid["D"] = solD
+fid["alpha"] = α
+fid["beta"] = α
+fid["grad"] = [ sol∇S[i][j,k] for i in eachindex(sol∇S), j in axes(X,1), k in axes(X,2) ];
+fid["delta"] = δ
+fid["lambda"] = sqrt(λ²)
+fid["epsilon"] = ε
+fid["tol"] = tol
+fid["crit_it"] = crit_it
+fid["p"] = p_ω
+fid["deltat"] = Δt
+close(fid)
+
+
 # kinetic energy
 solK = [norm(V)^2 for V in solV]/2/N;
 
 # plot the energy, subtracting IC
 plot(solK .- solK[1], linewidth=2, 
-    label=L"\frac{1}{2} \sum_i w_i V_i^2(t) - \frac{1}{2} \sum_i w_i V_i^2(0)", 
-    title = "exact acceleration, δ = $δ")
-plot!(λ/2 * (solD .- solD[1]), linewidth=2, 
-    label=L"\frac{\lambda}{2} S_\varepsilon(t) - \frac{\lambda}{2} S_\varepsilon(0)")
+    label=L"\frac{1}{2} \sum_i w_i V_i^2(t) - \frac{1}{2} \sum_i w_i V_i^2(0)",
+    title = "T = $(Int(round(time))), N = $N, ε = $(Int(round(ε*1e3)))e-3, λ² = $(Int(round(λ²))), tol = $(Int(round(log10(tol))))")
+plot!(λ²/2 * (solD  .- solD[1]), linewidth=2, 
+    label=L"\frac{\lambda}{2} S_\varepsilon(t) - \frac{\lambda^2}{2} S_\varepsilon(0)")
 
 #plot(solK + λ/2 * solD, linewidth=2, label=L"\frac{1}{2} \sum_i V_i^2(t) + \frac{\lambda}{2} S_\varepsilon(t)")
 
 
 # plot final configuration
 j = length(solX)
-plt = scatter(solX[j][1:div(N,3),1], solX[j][1:div(N,3),2], label = false, color = :blue, title = "T = $T, δ = $δ")
+plt = scatter(solX[j][1:div(N,3),1], solX[j][1:div(N,3),2], label = false, color = :blue, 
+                title = "T = $(Int(round(time))), N = $N, ε = $(Int(round(ε*1e3)))e-3, λ² = $(Int(round(λ²))), log10tol = $(Int(round(log10(tol))))")
 scatter!(solX[j][div(N,3)+1:div(2N,3),1], solX[j][div(N,3)+1:div(2N,3),2], label = false, color = :green)
 scatter!(solX[j][div(2N,3)+1:end,1], solX[j][div(2N,3)+1:end,2], label = false, color = :red)
 #savefig("20.pdf")

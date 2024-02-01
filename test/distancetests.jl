@@ -9,12 +9,12 @@ M = 30^2
 β = ones(M) / M
 
 d′ = 2*Int(floor(d/2))
-ε = N^(-1/(d′+4))
-q = 1.0
-Δ = 1.0
-s = ε
-tol = 1e-8
-crit_it = 20
+ε = N^(-1/(d′+4))       # entropic regularization. √ε is a length.
+q = 1.0                 # annealing parameter
+Δ = 1.0                 # characteristic domain size
+s = ε                   # current scale: no annealing -> equals ε
+tol = 1e-8              # marginal condition tolerance
+crit_it = 20            # acceleration inferrence
 p_ω = 2
 
 offset = 0.5
