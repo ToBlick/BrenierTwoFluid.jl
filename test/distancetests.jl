@@ -21,14 +21,15 @@ offset = 0.5
 
 Random.seed!(123)
 X = rand(N,d) .- 0.5
+Y = rand(M,d) .- 0.5
 
 for i in 1:2
         if i == 1 # Scaling test
                 truevalue = 1/2 * d * 1/12 * offset^2 #1/2 * d * offset^2
-                Y = (rand(M,d) .- 0.5) .* (1 + offset)
+                Y .= (rand(M,d) .- 0.5) .* (1 + offset)
         else # Shifting test
                 truevalue = 1/2 * d * offset^2
-                Y = (rand(M,d) .- 0.5) .+ offset
+                Y .= (rand(M,d) .- 0.5) .+ offset
         end
 
         CC = CostCollection(X, Y, c)
