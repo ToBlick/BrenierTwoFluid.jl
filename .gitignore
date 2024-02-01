@@ -35,6 +35,6 @@ Manifest.toml
 notebooks/
 
 # Figures
-figs/
 *.pdf
-runs/
+*.gif
+*.hdf5
