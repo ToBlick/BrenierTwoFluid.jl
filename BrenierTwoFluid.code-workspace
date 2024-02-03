@@ -4,10 +4,7 @@
 			"path": "."
 		},
 		{
-			"path": "../OptimalMappings"
-		},
-		{
-			"path": "../WassersteinDictionaries.jl"
+			"path": "../../Documents/Articles/BrenierFluids/overleaf"
 		}
 	],
 	"settings": {

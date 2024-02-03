@@ -1,42 +1,33 @@
-# compute W_2 distance between two uniform distributions
-
-using BrenierTwoFluid
-using Distances
-using Plots
-using LinearAlgebra
-
-d = 2
-c = (x,y) -> 0.5 * sqeuclidean(x,y)
-∇c = (x,y) -> x - y
+# compute W_2 barycenter between two distributions shifted by +/- an offset - barycenter should be the original distribution
 
 N = 200
 M = N
 α = ones(N) / N
 β = ones(M) / M
-
-
-X = rand(N,d) .- 0.1
-Y = rand(M,d) .+ 0.1
-Z = rand(N,d) 
 μ = ones(N) / N
+
+X = rand(N,d) .- 0.2
+Y = rand(M,d) .+ 0.2
+Z = rand(N,d)
+Z_true = rand(N,d) 
 
 Vα = SinkhornVariable(X,α)
 Vβ = SinkhornVariable(Y,β)
 Vμ = SinkhornVariable(Z,μ);
+Vμ_true = SinkhornVariable(Z_true,μ);
 
 CCαβ = CostCollection(X, Y, c)
 CCμα = CostCollection(Z, X, c)
 CCμβ = CostCollection(Z, Y, c)
-
 CCαμ = CostCollection(X, Z, c)
 CCβμ = CostCollection(Y, Z, c)
 
-δ = N^(-1/2)
-ε = δ^2 #N^(-3/(d′+4))
-q = 0.9
-Δ = 1.0
-
+# weights
 ω = [0.5, 0.5];
+
+
+
+
 
 scatter(X[:,1],X[:,2],color=:red, label = "α")
 scatter!(Y[:,1],Y[:,2],color=:green, label = "β")

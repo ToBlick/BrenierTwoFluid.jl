@@ -223,7 +223,10 @@ function compute!(S::SinkhornDivergence)
             elseif it == S.params.crit_it
                 π2_err = marginal_error(S)
                 θ²_est = (π2_err/r_p)^(1/S.params.p_ω)
-                S.params.ω = Real(2 / (1 + sqrt(1 - θ²_est)))
+                if θ²_est > 1
+                    θ²_est = 0.95
+                end
+                S.params.ω = (2 / (1 + sqrt(1 - θ²_est)))
             end
 
             it += 1

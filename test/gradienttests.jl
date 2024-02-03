@@ -1,5 +1,4 @@
 # compute W_2 distance between two uniform distributions
-
 d′ = 2*Int(floor(d/2))
 d′′ = 2*Int(ceil(d/2))
 

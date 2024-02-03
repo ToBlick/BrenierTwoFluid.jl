@@ -11,34 +11,6 @@ Random.seed!(123)
 
 d = 2
 
-function c_periodic(x::VT,y::VT,D) where {T,VT <: AbstractVector{T}}
-    d = 0
-    for i in eachindex(x)
-        if x[i] - y[i] > D[i]/2
-            d += (x[i] - y[i] - D[i])^2
-        elseif x[i] - y[i] < -D[i]/2
-            d += (x[i] - y[i] + D[i])^2
-        else
-            d += (x[i] - y[i])^2
-        end
-    end
-    0.5 * d
-end
-
-function ∇c_periodic(x,y,D)
-    ∇c = zero(x)
-    for i in eachindex(x)
-        if x[i] - y[i] > D[i]/2
-            ∇c[i] = x[i] - y[i] - D[i]
-        elseif x[i] - y[i] < -D[i]/2
-            ∇c[i] = (x[i] - y[i] + D[i])
-        else
-            ∇c[i] = x[i] - y[i]
-        end
-    end
-    ∇c
-end
-
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
 #D = 1*ones(2);
