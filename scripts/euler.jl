@@ -8,7 +8,7 @@ using ProgressBars
 using HDF5
 using Dates
 
-function run_euler(path, d, c, ∇c, seed, δ, ε, q, Δ, s, tol, crit_it, p_ω, sym, acc)
+function run_euler(path, d, c, ∇c, seed, Δt, δ, ε, q, Δ, s, tol, crit_it, p_ω, sym, acc)
     Random.seed!(seed)
 
     # initial conditions - identical
@@ -22,7 +22,7 @@ function run_euler(path, d, c, ∇c, seed, δ, ε, q, Δ, s, tol, crit_it, p_ω,
             Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
         end
     end
-    X .= Y #.+ rand(N,d) * δ .- δ/2   # wiggle by δ
+    #X .= Y #.+ rand(N,d) * δ .- δ/2   # wiggle by δ
     X .= X[sortperm(X[:,1]), :]
     Y .= Y[sortperm(Y[:,1]), :];
 
@@ -48,9 +48,8 @@ function run_euler(path, d, c, ∇c, seed, δ, ε, q, Δ, s, tol, crit_it, p_ω,
     @assert δ^2 > valS
 
     K₀ = 0.5 * dot(V,diagm(α) * V) #0.25    # initial kinetic energy
-    λ² = 2*K₀/(δ^2 - valS)                  # relaxation to enforce dist < δ
-
-    Δt = 1/25                               # time-step               
+    λ² = 2*K₀/(δ^2) # 2*K₀/(δ^2 - valS)                  # relaxation to enforce dist < δ
+          
     t = 0
 
     T = 1.0     # final time
@@ -75,6 +74,7 @@ function run_euler(path, d, c, ∇c, seed, δ, ε, q, Δ, s, tol, crit_it, p_ω,
         X .+= 0.5 * Δt * V
 
         #reflecting boundary
+        #=
         for i in axes(X,1)
             for j in 1:2
                 if X[i,j] > 0.5
@@ -86,6 +86,7 @@ function run_euler(path, d, c, ∇c, seed, δ, ε, q, Δ, s, tol, crit_it, p_ω,
                 end
             end
         end
+        =#
 
         S.params.s = s  # if scaling is used it should be reset here
         initialize_potentials!(V1,V2,CC)
@@ -149,18 +150,18 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
 
 d′ = 2*floor(d/2)
-δ = 0.05    # spatial tolerance 
-ε = δ^2     # entropic regularization parameter
+δ = 0.03    # spatial tolerance 
+ε = 10 * δ^2     # entropic regularization parameter
 
-N = 40^2 #Int((ceil(1e-1/ε))^(d))  
+N = 64^2 #Int((ceil(1e-1/ε))^(d))  
 #N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
 M = N #Int((ceil(N^(1/d))^d))
 
 q = 1.0         # ε-scaling rate
 Δ = 1.0         # characteristic domain size
 s = ε           # initial scale (ε)
-tol = 1e-1 * δ      # tolerance on marginals (absolute)
-crit_it = Int(ceil(0.05 * Δ / ε))    # when to compute acceleration
+tol = 1e-5      # tolerance on marginals (absolute)
+crit_it = Int(ceil(0.1 * Δ / ε))    # when to compute acceleration
 p_ω = 2         # acceleration heuristic
 
 sym = false
@@ -168,4 +169,6 @@ acc = true
 
 seed = 123
 
-run_euler(path, d, c, ∇c, seed, δ, ε, q, Δ, s, tol, crit_it, p_ω, sym, acc)
+Δt = 1/50
+
+run_euler(path, d, c, ∇c, seed, Δt, δ, ε, q, Δ, s, tol, crit_it, p_ω, sym, acc)

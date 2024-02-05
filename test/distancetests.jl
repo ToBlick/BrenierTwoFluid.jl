@@ -4,12 +4,12 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x - y
 d = 3
 N = 20^2
-M = 30^2
+M = 25^2
 α = ones(N) / N
 β = ones(M) / M
 
 d′ = 2*Int(floor(d/2))
-ε = N^(-1/(d′+4))       # entropic regularization. √ε is a length.
+ε = 0.1 * N^(-1/(d′+4))       # entropic regularization. √ε is a length.
 q = 1.0                 # annealing parameter
 Δ = 1.0                 # characteristic domain size
 s = ε                   # current scale: no annealing -> equals ε

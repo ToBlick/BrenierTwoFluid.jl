@@ -3,14 +3,14 @@
 using Plots
 using LinearAlgebra
 
-d = 2
-N = 500
-M = 500
+d = 3
+N = 30^2
+M = 30^2
 α = ones(N) / N
 β = ones(M) / M
 
-offset = 0.0
-truevalue = 0.0
+offset = 0.5
+truevalue = 1/2 * d * 1/12 * offset^2
 
 X = rand(N,d) .- 0.5
 Y = (rand(M,d) .- 0.5) .* (1 + offset)
@@ -22,14 +22,13 @@ V = SinkhornVariable(X,α)
 W = SinkhornVariable(Y,β)
 
 d′ = 2*Int(floor(d/2))
-δ = N^(-1/2)
-ε = 0.01 * N^(-1/(d′+4)) # δ^2 #N^(-3/(d′+4))
-#0.1 * N^(-1/(d′+4))
+δ = 0.1
+ε = δ^2
 q = 1.0
 Δ = 1.0
 s = ε
-tol = 1e-4
-crit_it = 10
+tol = 1e-8
+crit_it = Int(ceil(0.05 * Δ / ε))
 p_ω = 2
 
 ### Safe version
@@ -48,7 +47,10 @@ S = SinkhornDivergence(V,W,CC,params);
 initialize_potentials!(V,W,CC);
 @time valS = compute!(S);
 value(S)
+truevalue
+abs(value(S) - truevalue)
 abs(value(S) - truevalue) * sqrt(sqrt(N*M))
+
 Π = TransportPlan(S);
 sum(Matrix(Π))
 S.params.ω

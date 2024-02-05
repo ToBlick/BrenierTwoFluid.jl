@@ -46,49 +46,19 @@ struct SinkhornDivergence{T, d, AT, VT, CT, PT <: SinkhornParameters{T}}
     params::PT
     f₋::VT
     g₋::VT
+    h₁₋::VT
+    h₂₋::VT
 end
 
 issafe(SP::SinkhornParameters{T, SAFE}) where {T,SAFE} = SAFE
 issymmetric(SP::SinkhornParameters{T, SAFE, SYM}) where {T,SAFE, SYM} = SYM
 isaccelerated(SP::SinkhornParameters{T, SAFE, SYM, ACC}) where {T, SAFE, SYM, ACC} = ACC
 
-#=
-function SinkhornDivergence(V1::SinkhornVariable{T,d,AT,VT}, 
-                            V2::SinkhornVariable{T,d,AT,VT}, 
-                            CC::CostCollection{T,CT};
-                            Δ = maximum(CC.C_xy),
-                            q = 0.9,
-                            ω = 1.0,
-                            s = Δ,
-                            ε = maximum(CC.C_xy) * 1e-3,
-                            p = 2.0,
-                            tol = Inf,
-                            maxit = Int(ceil(Δ/ε)),
-                            symmetric = false) where {T,d,AT <: AbstractArray{T,d},VT <: AbstractVector{T},CT}
-                            SinkhornDivergence(V1,V2,CC,SinkhornParameters(Δ,q,ω,s,ε,p,tol,maxit,symmetric),zero(V1.f),zero(V2.f))
-end
-
-function SinkhornDivergence(X::AT,α::VT,
-    Y::AT,β::VT,
-    CC::CostCollection{T,CT};
-    Δ = maximum(CC.C_xy),
-    q = 0.9,
-    ω = 1.0,
-    s = Δ,
-    ε = maximum(CC.C_xy) * 1e-3,
-    p = 2.0,
-    tol = Inf,
-    maxit = Int(ceil(Δ/ε)),
-    symmetric = false) where {T,d,AT <: AbstractArray{T,d},VT <: AbstractVector{T},CT}
-    SinkhornDivergence(SinkhornVariable(X,α),SinkhornVariable(Y,β),CC,SinkhornParameters(Δ,q,ω,s,ε,p,tol,maxit,symmetric),zero(V1.f),zero(V2.f))
-end
-=#
-
 function SinkhornDivergence(V1::SinkhornVariable{T,d,AT,VT}, 
     V2::SinkhornVariable{T,d,AT,VT}, 
     CC::CostCollection{T,CT},
     params::SinkhornParameters) where {T,d,AT <: AbstractArray{T,d},VT <: AbstractVector{T},CT}
-    SinkhornDivergence(V1,V2,CC,params,zero(V1.f),zero(V2.f))
+    SinkhornDivergence(V1,V2,CC,params,zero(V1.f),zero(V2.f),zero(V1.f),zero(V2.f))
 end
 
 scale(S::SinkhornDivergence) = S.params.s
@@ -110,54 +80,45 @@ function softmin(j, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::Abstract
             M = v
         end
     end
-    (- ε * (log(r) + M))
+    return (- ε * (log(r) + M))
 end
 
 function sinkhorn_step!(S::SinkhornDivergence{T}) where T
     if issymmetric(S.params)
-        @inbounds for i in eachindex(S.V1.f)
-            S.V1.f[i] = 1/2 * S.f₋[i] + 1/2 * softmin(i, S.CC.C_yx, S.g₋, S.V2.log_α, scale(S))
-            S.V1.h[i] = 1/2 * S.V1.h[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h, S.V1.log_α, scale(S))
+        @threads for i in eachindex(S.V1.f)
+            @inbounds S.V1.f[i] = 1/2 * S.f₋[i] + 1/2 * softmin(i, S.CC.C_yx, S.g₋, S.V2.log_α, scale(S))
+            @inbounds S.V1.h[i] = 1/2 * S.V1.h[i] + 1/2 * softmin(i, S.CC.C_xx, S.h₁₋, S.V1.log_α, scale(S))
             if isaccelerated(S.params)
-                S.V1.f[i] = (1 - acceleration(S)) * S.f₋[i] + acceleration(S) * S.V1.f[i]
+                @inbounds S.V1.f[i] = (1 - acceleration(S)) * S.f₋[i] + acceleration(S) * S.V1.f[i]
             end
         end
-        @inbounds for j in eachindex(S.V2.f)
-            S.V2.f[j] = 1/2 * S.g₋[j] + 1/2 * softmin(j, S.CC.C_xy, S.f₋, S.V1.log_α, scale(S))
-            S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h, S.V2.log_α, scale(S))
+        @threads for j in eachindex(S.V2.f)
+            @inbounds S.V2.f[j] = 1/2 * S.g₋[j] + 1/2 * softmin(j, S.CC.C_xy, S.f₋, S.V1.log_α, scale(S))
+            @inbounds S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.h₂₋, S.V2.log_α, scale(S))
             # no acceleration is done for the symmetric problem
             if isaccelerated(S.params)
-                S.V2.f[j] = (1 - acceleration(S)) * S.g₋[j] + acceleration(S) * S.V2.f[j]
+                @inbounds S.V2.f[j] = (1 - acceleration(S)) * S.g₋[j] + acceleration(S) * S.V2.f[j]
             end
         end
     else
-        @inbounds for i in eachindex(S.V1.f)
+        @threads for i in eachindex(S.V1.f)
             if isaccelerated(S.params)
-                S.V1.f[i] = (1 - acceleration(S)) * S.V1.f[i] +  acceleration(S) * softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
+                @inbounds S.V1.f[i] = (1 - acceleration(S)) * S.V1.f[i] + acceleration(S) * softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
             else
-                S.V1.f[i] = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
+                @inbounds S.V1.f[i] = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
             end
-            S.V1.h[i] = 1/2 * S.V1.h[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h, S.V1.log_α, scale(S))
+            @inbounds S.V1.h[i] = 1/2 * S.V1.h[i] + 1/2 * softmin(i, S.CC.C_xx, S.h₁₋, S.V1.log_α, scale(S))
         end
-        @inbounds for j in eachindex(S.V2.f)
+        @threads for j in eachindex(S.V2.f)
             if isaccelerated(S.params)
-                S.V2.f[j] = (1 - acceleration(S)) * S.V2.f[j] + acceleration(S) * softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S))
+                @inbounds S.V2.f[j] = (1 - acceleration(S)) * S.V2.f[j] + acceleration(S) * softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S))
             else
-                S.V2.f[j] = softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S))
+                @inbounds S.V2.f[j] = softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S))
             end
-            S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h, S.V2.log_α, scale(S))
+            @inbounds S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.h₂₋, S.V2.log_α, scale(S))
         end
     end
 end
-
-#=
-function sinkhorn_step!(f, f₋, g₋, h, log_α, log_β, C_yx, C_xx, ε) where T
-    @inbounds for i in eachindex(f)
-        f[i] = 1/2 * f₋[i] + 1/2 * softmin(i, C_yx, g₋, log_β, ε)
-        h[i] = 1/2 * h[i] + 1/2 * softmin(i, C_xx, h, log_α, ε)
-    end
-end
-=#
 
 function compute!(S::SinkhornDivergence)
     it = 1
@@ -173,6 +134,8 @@ function compute!(S::SinkhornDivergence)
                 S.f₋ .= S.V1.f
                 S.g₋ .= S.V2.f
             end
+            S.h₁₋ .= S.V1.h
+            S.h₂₋ .= S.V2.h
 
             # lower the scale
             S.params.s = scale(S) * S.params.q
@@ -211,6 +174,8 @@ function compute!(S::SinkhornDivergence)
                 S.f₋ .= S.V1.f
                 S.g₋ .= S.V2.f
             end
+            S.h₁₋ .= S.V1.h
+            S.h₂₋ .= S.V2.h
 
             # lower the scale
             if S.params.q != 1

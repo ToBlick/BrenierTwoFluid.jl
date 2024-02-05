@@ -4,7 +4,7 @@ using LaTeXStrings
 using LinearAlgebra
 
 ### Input the .hdf5 here
-results = "runs/2024-02-02T20:27:11.081.hdf5"
+results = "runs/2024-02-04T21:55:09.292.hdf5"
 ###
 
 # read results and parameters
@@ -25,6 +25,11 @@ p_ω =     read(fid["p"])
 close(fid)
 nt = size(solX,1) - 1
 N = size(solX,2)
+
+λ²
+N
+ε
+
 
 # calculate diagnostics
 K = 1/2 * [dot(solV[i,:,:], diagm(α) * solV[i,:,:]) for i in axes(solV,1)]; #kinetic energy
@@ -50,4 +55,12 @@ for j in axes(solX,1)
     savefig("figs/particles_$(j).pdf")
 end
 
-maximum(solX)
+u0(x) = [-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2])]
+ΔV = zero(solD);
+for i in eachindex(ΔV)
+    for j in axes(solV,2)
+        ΔV[i] += norm(solV[i,j,:] - u0(solX[i,j,:]))
+    end
+end
+ΔV ./= N;
+plot(0:Δt:1, ΔV)
