@@ -5,7 +5,6 @@ struct LazyCost{T, d, AT <: AbstractArray{T,d}, FT <: Base.Callable} <: Abstract
     c::FT
 
     function LazyCost(x::AT, y::AT, c::FT = (x,y) -> 0.5 * sqeuclidean(x,y) ) where {T, d, AT <: AbstractArray{T,d}, FT <: Base.Callable}
-        #t = c(x[begin], y[begin])
         new{T,d,AT,FT}(x,y,c)
     end
 end
@@ -13,21 +12,6 @@ end
 Base.getindex(C::LazyCost{T,1}, i, j) where {T} = C.c(C.x[i], C.y[j])::T
 Base.getindex(C::LazyCost{T}, i, j) where {T} = @views C.c(C.x[i,:], C.y[j,:])::T
 Base.size(C::LazyCost) = (size(C.x,1), size(C.y,1))
-
-#=struct LazySlice{T,CT} <: AbstractVector{T}
-    j::Int
-    C::AbstractMatrix{CT}
-    f::AbstractVector{T}
-    log_α::AbstractVector{T}
-    ε::T
-
-    function LazySlice( j::Int, C::AbstractMatrix{CT}, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::Real) where {T, CT}
-        new{T,CT}(j, C, f, log_α, ε)
-    end
-end
-Base.getindex(S::LazySlice{T}, i) where {T} = S.f[i] / S.ε - S.C[i, S.j] / S.ε + S.log_α[i]
-Base.size(S::LazySlice) = size(S.f)
-=#
 
 struct CostCollection{T, CT <: AbstractMatrix{T}}
     C_xy::CT
@@ -68,3 +52,18 @@ function ∇c_periodic(x,y,D)
     end
     ∇c
 end
+
+        #reflecting boundary
+        #=
+        for i in axes(X,1)
+            for j in 1:2
+                if X[i,j] > 0.5
+                    X[i,j] = 1 - X[i,j]
+                    V[i,j] *= -1
+                elseif X[i,j] < -0.5
+                    X[i,j] = - 1 - X[i,j]
+                    V[i,j] *= -1
+                end
+            end
+        end
+        =#

@@ -1,158 +1,117 @@
 using Distances
 using Plots
-using LatinHypercubeSampling
-using Sobol
 using BrenierTwoFluid
 using LinearAlgebra
 using Random
 using LaTeXStrings
+using ProgressBars
 
 Random.seed!(123)
 
 d = 2
-
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
-#D = 1*ones(2);
-#c = (x,y) -> c_periodic(x,y,D)
-#∇c = (x,y) -> ∇c_periodic(x,y,D)
 
-δ = 5e-2
-N = 25^2 # Int(ceil(δ^(-3/4*d)))
-M = N
+#
+# Attempting to re-create a test like the Beltrami incompressible Euler one for two fluids
+# with equal mass and charge
+#
+
+
+### parameters
+d = 2
+c = (x,y) -> 0.5 * sqeuclidean(x,y)
+∇c = (x,y) -> x-y
 d′ = 2*floor(d/2)
-ε = δ^2 #N^(-1/(d′+4))
-sqrt(ε)
+ε = 0.01     # entropic regularization parameter
+λ² = 500
+N = 32^2    # particle number
+M = N
+q = 1.0         # ε-scaling rate
+Δ = 1.0         # characteristic domain size
+s = ε           # initial scale (ε)
+tol = 1e-5      # tolerance on marginals (absolute)
+crit_it = 20    # Int(ceil(0.1 * Δ / ε))    # when to compute acceleration
+p_ω = 2         # acceleration heuristic
+sym = false
+acc = true
+seed = 123
+Δt = 1/50
+max_it = 1000
 
-mα = 1
-mβ = 1
-
-Zβ = 1
-
+# draw samples
 X = rand(N,d) .- 0.5;
 Y = rand(M,d) .- 0.5;
 #uniform grid
-for k in 1:Int(sqrt(M))
-    for l in 1:Int(sqrt(M))
-        Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
-    end
-end
-X .= Y .+ rand(N,d) * sqrt(ε) .- sqrt(ε)/2
-Y .+= rand(N,d) * sqrt(ε) .- sqrt(ε)/2
-
+#for k in 1:Int(sqrt(M))
+#    for l in 1:Int(sqrt(M))
+#        Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
+#    end
+#end
+#X .= Y
 α = ones(N) / N
 β = ones(M) / M
-
 X .= X[sortperm(X[:,1]), :]
 Y .= Y[sortperm(Y[:,1]), :];
 
-U = zero(X)
+# variables for the barycenter
+Z = rand(N,d) .- 0.5;
+μ = copy(α)
+
+# initial velocity for species one
+u0(x) = [-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2])]
+V = zero(X)
+W = zero(Y)
 for i in axes(X)[1]
-    U[i,:] .= 0.1
+    V[i,:] .= u0(X[i,:])
 end
 
-V = zero(Y)
-for i in axes(Y)[1]
-    V[i,:] .= 0
-end
+params = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
+Vα  = SinkhornVariable(X, α)
+Vβ = SinkhornVariable(Y, β)
+S = SinkhornDivergence(Vα, Vβ, c, params)
+compute!(S)
 
-K₀ = mα * norm(U)^2/2/N + mβ * norm(V)^2/2/N
-Δt = 1/20
-λ = 2*K₀/δ^2 # Δt^(-2) # N^(d/2) * N
 t = 0
-q = 0.8
-Δ = 1.0
+T = 0.5     # final time
+nt = Int(ceil((T-t)/Δt))
 
-solX = []
-solY = []
-solU = []
-solV = []
-solD = []
+solX = [ zero(X) for i in 1:(nt) ]
+solV = [ zero(V) for i in 1:(nt) ]
+solY = [ zero(Y) for i in 1:(nt) ]
+solW = [ zero(V) for i in 1:(nt) ]
+solD = [ 0.0 for i in 1:(nt + 1) ]
 
-Z = rand(N,d)
-Z .= Y .+ rand(N,d) * sqrt(ε) .- sqrt(ε)/2
-μ = ones(N) / N
+ω = [0.5, 0.5];
+B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3);
 
-Vα = SinkhornVariable(X,α)
-Vβ = SinkhornVariable(Y,β)
-Vμ = SinkhornVariable(Z,μ);
+for it in ProgressBar(1:nt)
 
-CCαβ = CostCollection(X, Y, c)
-CCμα = CostCollection(Z, X, c)
-CCμβ = CostCollection(Z, Y, c)
-CCαμ = CostCollection(X, Z, c)
-CCβμ = CostCollection(Y, Z, c)
+    X .+= 0.5 * Δt * V
+    Y .+= 0.5 * Δt * W
 
-Sαβ = SinkhornDivergence(Vα, Vβ, CCαβ; ε=ε, q=q , Δ=Δ, tol = 1e-2);
-Vμ, val = barycenter_sinkhorn!(ω, Vμ, [Vα, Vβ], [CCμα, CCμβ], ∇c, (Sαβ.params), 5, δ);
-val
+    valB = compute!(B)
 
-Sαμ = SinkhornDivergence(Vα, Vμ, CCαμ; ε=ε, q=q , Δ=Δ, tol = 1e-3)
-Sβμ = SinkhornDivergence(Vβ, Vμ, CCβμ; ε=ε, q=q , Δ=Δ, tol = 1e-3)
+    V .-= Δt * λ² .* y_gradient!(B.Ss[1], B.∇c)
+    W .-= Δt * λ² .* y_gradient!(B.Ss[2], B.∇c)
 
-push!(solX, copy(X))
-push!(solY, copy(Y))
-push!(solU, copy(U))
-push!(solV, copy(V))
-push!(solD, val)
+    X .+= 0.5 * Δt * V
+    Y .+= 0.5 * Δt * W
 
-scatter(X[:,1],X[:,2],color=:red, label = "α")
-scatter!(Y[:,1],Y[:,2],color=:green, label = "β")
-scatter!(Z[:,1],Z[:,2],color=:blue, label = "μ")
-
-@time while t < 1.0
-
-    X .+= 0.5 * Δt * U
-    Y .+= 0.5 * Δt * V
-
-    Z .= 0.5 .* X .+ 0.5 .* Y
-
-    # compute barycenter
-    Vμ, val, ∇S_vec = barycenter_sinkhorn!(ω, Vμ, [Vα, Vβ], [CCμα, CCμβ], ∇c, (Sαβ.params), 5, δ);
-    # compute forces
-    # on α
-    Sαμ.params.s = Δ
-    initialize_potentials!(Sαμ.V1,Sαμ.V2,CCαμ)
-    compute!(Sαμ)
-    ∇_α_Sαμ = x_gradient(Sαμ, ∇c)
-    # on β
-    Sβμ.params.s = Δ
-    initialize_potentials!(Sβμ.V1,Sβμ.V2,CCβμ)
-    compute!(Sβμ)
-    ∇_β_Sβμ = x_gradient(Sβμ, ∇c)
-
-    U .-= Δt * λ .* ∇_α_Sαμ ./ α ./ mα
-    V .-= Δt * λ .* ∇_β_Sβμ ./ β ./ mβ ./ Zβ
-
-    X .+= 0.5 * Δt * U
-    Y .+= 0.5 * Δt * V
-
-    push!(solX, copy(X))
-    push!(solY, copy(Y))
-    push!(solU, copy(U))
-    push!(solV, copy(V))
-    push!(solD, val)
-
-    t += Δt
+    solX[it] = copy(X)
+    solV[it] = copy(V)
+    solY[it] = copy(Y)
+    solW[it] = copy(W)
+    solD[it] = valB
 end
 
-solK = [mα * norm(solU[t])^2/2/N + mβ * norm(solV[t])^2/2/N for t in eachindex(solU)]
-
-solK
-
-plot(solK .- solK[1], linewidth=2, label=L"\frac{1}{2} \sum_i V_i^2(t) - \frac{1}{2} \sum_i V_i^2(0)", legend = :bottomright)
-plot!(λ/2 * (solD .- solD[1]), linewidth=2, label=L"\frac{\lambda}{2} S_\varepsilon(t) - \frac{\lambda}{2} S_\varepsilon(0)")
-
-T = length(solX)
-j = T
-
-scatter(solX[j][:,1],solX[j][:,2],color=:red, label = "α")
-scatter!(solY[j][:,1],solY[j][:,2],color=:green, label = "β")
-
-anim = @animate for j in 1:T
-    scatter(solX[j][:,1],solX[j][:,2],color=:red, label = "α", ylim = (-0.6,0.6), xlim = (-0.6,0.6))
-    scatter!(solY[j][:,1],solY[j][:,2],color=:green, label = "β", ylim = (-0.6,0.6), xlim = (-0.6,0.6))
+anim = @animate for j in eachindex(solX)
+    scatter(solX[j][:,1],solX[j][:,2], legend = :topright, color=:red, label = "α", xlims = (-0.55,0.55), ylims = (-0.55,0.55))
+    scatter!(solY[j][:,1],solY[j][:,2],color=:green, label = "β")
 end
-gif(anim, "anim_fps10.gif", fps = 10)
+gif(anim, "figs/twofluid_vortex.gif", fps = 8)
 
-sqrt.(abs.(solD))
+plot(λ²/2 * solD, linewidth = 2, label = "λ² dist²")
+plot!( 1/2 * [dot(solV[i], diagm(α) * solV[i]) for i in axes(solV,1)], linewidth = 2, label = "K(α)" )
+plot!( 1/2 * [dot(solW[i], diagm(β) * solW[i]) for i in axes(solV,1)], linewidth = 2, label = "K(β)" )
+savefig("figs/twofluid_vortex_energy.png")

@@ -1,7 +1,10 @@
 # compute W_2 distance between two uniform distributions
-
-using Plots
+using BrenierTwoFluid
+using Test
+using Distances
+using Random
 using LinearAlgebra
+using Plots
 
 d = 3
 N = 30^2
@@ -9,7 +12,7 @@ M = 30^2
 α = ones(N) / N
 β = ones(M) / M
 
-offset = 0.5
+offset = 0.1
 truevalue = 1/2 * d * 1/12 * offset^2
 
 X = rand(N,d) .- 0.5
@@ -22,38 +25,41 @@ V = SinkhornVariable(X,α)
 W = SinkhornVariable(Y,β)
 
 d′ = 2*Int(floor(d/2))
-δ = 0.1
-ε = δ^2
+ε = 0.1
 q = 1.0
 Δ = 1.0
 s = ε
-tol = 1e-8
-crit_it = Int(ceil(0.05 * Δ / ε))
+tol = 1e-12
+crit_it = 20 #Int(ceil(0.1 * Δ / ε))
 p_ω = 2
-
-### Safe version
 
 params = SinkhornParameters(CC;
                             ε=ε,
-                            q=1.0,
-                            Δ=1.0,
+                            q=q,
+                            Δ=Δ,
                             s=s,
                             tol=tol,
                             crit_it=crit_it,
+                            max_it=1000,
                             p_ω=p_ω,
                             sym=false,
                             acc=true);
 S = SinkhornDivergence(V,W,CC,params);
-initialize_potentials!(V,W,CC);
-@time valS = compute!(S);
-value(S)
+BrenierTwoFluid.issafe(S)
+initialize_potentials!(V,W,CC)
+@time compute!(S)
+BrenierTwoFluid.marginal_errors(S)
+valS
 truevalue
 abs(value(S) - truevalue)
 abs(value(S) - truevalue) * sqrt(sqrt(N*M))
+acceleration(S)
+
+∇S = zero(X);
+@time ∇S = x_gradient!(S, ∇c);
 
 Π = TransportPlan(S);
 sum(Matrix(Π))
-S.params.ω
 
 # dual potential violation: 
 BrenierTwoFluid.marginal_errors(S)

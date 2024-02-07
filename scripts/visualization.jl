@@ -4,7 +4,7 @@ using LaTeXStrings
 using LinearAlgebra
 
 ### Input the .hdf5 here
-results = "runs/2024-02-04T21:55:09.292.hdf5"
+results = "runs/2024-02-07T14:54:12.987.hdf5"
 ###
 
 # read results and parameters
@@ -29,6 +29,10 @@ N = size(solX,2)
 λ²
 N
 ε
+tol
+Δt
+crit_it
+p_ω
 
 
 # calculate diagnostics
@@ -36,7 +40,7 @@ K = 1/2 * [dot(solV[i,:,:], diagm(α) * solV[i,:,:]) for i in axes(solV,1)]; #ki
 
 # energy Plot
 plot(0:Δt:1, K .- K[1], minorgrid = true, xlabel = L"t",
-    legendfontsize=14, tickfontsize=10, xguidefontsize=14, yguidefontsize=14,
+    legendfontsize=12, tickfontsize=10, xguidefontsize=14, yguidefontsize=14,
     linewidth = 2, label=L"\frac{1}{2} \sum_i w_i (V_i^2(t) - V_i^2(0))")
 plot!(0:Δt:1, λ²/2 * solD .- λ²/2 * solD[1],
     linewidth = 2, label=L"\frac{\lambda^2}{2} (S^2_\varepsilon(t) - S^2_\varepsilon(0))")

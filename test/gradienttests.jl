@@ -27,8 +27,8 @@ for i in 1:2
         S = SinkhornDivergence(V,W,CC,params)
         initialize_potentials!(V,W,CC)
         valueS = compute!(S)
-        x_gradient!(∇S_x, S, ∇c)
-        y_gradient!(∇S_y, S, ∇c)
+        ∇S_x = x_gradient!(S, ∇c)
+        ∇S_y = y_gradient!(S, ∇c)
 
         if i == 1
                 @test dot(X - ∇S_x - (1 + offset) * X, α .* (X - ∇S_x - (1 + offset) * X)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))

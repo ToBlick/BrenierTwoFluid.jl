@@ -5,6 +5,7 @@ version = "1.0.0-DEV"
 
 [deps]
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"

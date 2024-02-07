@@ -17,7 +17,7 @@ export SinkhornDivergence, SinkhornParameters, softmin, sinkhorn_step!, value, c
 export scale, maxit, tol, acceleration, marginal_error
 
 include("barycenter.jl")
-export barycenter_sinkhorn!
+export SinkhornBarycenter, compute!
 
 include("transportplans.jl")
 export TransportPlan, transportmatrix

@@ -7,4 +7,5 @@ using LinearAlgebra
 @testset "BrenierTwoFluid.jl" begin
     include("distancetests.jl")
     include("gradienttests.jl")
+    include("barycentertests.jl")
 end

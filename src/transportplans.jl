@@ -5,7 +5,7 @@ struct TransportPlan{T, d, AT <: AbstractArray{T,d}, VT <: AbstractVector{T}, CT
     C::CT
     ε::T
 
-    function TransportPlan(S::SinkhornDivergence{T,d,AT,VT,CT}) where {T,d,AT,VT,CT}
+    function TransportPlan(S::SinkhornDivergence{T, SAFE, SYM, ACC, d, AT, VT, CT}) where {T, SAFE, SYM, ACC, d, AT, VT, CT}
         new{T,d,AT,VT,CT}(transportmatrix(S),S.V1,S.V2,S.CC.C_xy,scale(S))
     end
 end

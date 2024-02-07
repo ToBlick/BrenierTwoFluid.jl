@@ -20,11 +20,12 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 
 # maximum N is 64 * 2^(i_max-1)
 i_max = 7
-64 * 2^(i_max-1)
+32 * 2^(i_max-1)
 
 # acceleration is inferred from convergence rate after crit_it iterations. No scaling.
-tol = 1e-6
+tol = 1e-8
 crit_it = 20
+max_it = 10000
 p_ω = 2
 q = 1.0
 Δ = 1.0
@@ -34,13 +35,11 @@ truevalue = 1/2 * d * 1/12 * offset^2 #1/2 * d * offset^2
 
 epochs = 10
 
-N_vec = [ 64 * 2^(i-1) for i in 1:i_max ]
+N_vec = [ 32 * 2^(i-1) for i in 1:i_max ]
 S_vec = zeros(2, length(N_vec), epochs)
 times = zero(S_vec);
 
-Random.seed!(123)
-for j in ProgressBar(eachindex(N_vec))
-
+@time for j in ProgressBar(eachindex(N_vec))
     N = N_vec[j]
     M = N
 
@@ -48,6 +47,7 @@ for j in ProgressBar(eachindex(N_vec))
     β = ones(M) / M
 
     for k in 1:epochs
+        Random.seed!(k)
         X = rand(N,d) .- 0.5
         Y = (rand(M,d) .- 0.5) .* (1 + offset)
 
@@ -58,16 +58,16 @@ for j in ProgressBar(eachindex(N_vec))
         ε = 1.0
         for i in 1:2
             if i == 1
-                ε = 0.1*N^(-1/(d′+4))
+                ε = 0.5 #0.1*N^(-1/(d′+4))
             elseif i == 2
-                ε = 0.1*N^(-1/d)
+                ε = 0.1 #0.1*N^(-1/d)
             #else
             #    ε = N^(-2/d)
             end
             
             s = ε
 
-            params = SinkhornParameters(CC;ε=ε,q=q,Δ=Δ,s=s,crit_it=crit_it,p_ω=p_ω,tol=tol,maxit=10*Int(ceil(Δ/ε)),sym=false,acc=acc)
+            params = SinkhornParameters(CC;ε=ε,q=q,Δ=Δ,s=s,crit_it=crit_it,p_ω=p_ω,tol=tol,max_it=100*Int(ceil(Δ/ε)),sym=false,acc=acc)
             
             S = SinkhornDivergence(V,W,CC,params)
             initialize_potentials!(V,W,CC)
@@ -77,26 +77,31 @@ for j in ProgressBar(eachindex(N_vec))
     end
 end
 
-p = plot(N_vec, mean(abs.(S_vec[1,:,:] .- truevalue), dims = 2), 
+S_avg_1 = mean((abs.(S_vec[1,:,:] .- truevalue)), dims = 2)
+S_avg_2 = mean((abs.(S_vec[2,:,:] .- truevalue)), dims = 2)
+S_err_1 = std((abs.(S_vec[1,:,:] .- truevalue)), dims = 2)
+S_err_2 = std((abs.(S_vec[2,:,:] .- truevalue)), dims = 2)
+
+p = plot(N_vec, S_avg_1, ribbon = S_err_1, ylim = (1e-5, 2e-2),
         minorgrid = true, xlabel = L"N", ylabel = L"| S_\varepsilon(n^\alpha_N, n^\beta_N)^2 - W_2(n^\alpha, n^\beta)^2 |", yaxis=:log, xaxis = :log,
-legend = :bottomleft, legendfontsize=14, tickfontsize=10, xguidefontsize=14, yguidefontsize=14,
-        linewidth = 2, label = L"\varepsilon = 0.1 N^{-1/(d′+4)}", color = palette(:default)[1])
-    plot!(N_vec, mean(abs.(S_vec[2,:,:] .- truevalue), dims = 2),
-        linewidth = 2, fillalpha=0.33, label = L"\varepsilon = 0.1 N^{-1/d}", color = palette(:default)[2])
-for i in 1:epochs
+legend = :topright, legendfontsize=14, tickfontsize=10, xguidefontsize=14, yguidefontsize=14,
+        linewidth = 2, label = L"\varepsilon = 0.5", color = palette(:default)[1])
+plot!(N_vec, S_avg_2, ribbon = S_err_2,
+        linewidth = 2, fillalpha=0.33, label = L"\varepsilon = 0.1", color = palette(:default)[2])
+#=for i in 1:epochs
     plot!(N_vec, abs.(S_vec[1,:,i] .- truevalue), 
         linewidth = 1, alpha=0.3, label = false, color = palette(:default)[1])
     plot!(N_vec, abs.(S_vec[2,:,i] .- truevalue), 
         linewidth = 1, alpha=0.3, label = false, color = palette(:default)[2])
 end
-plot!(N_vec, x -> 1e-1 * x^(-2/(d′+4)),
-    linewidth = 2, label = L"0.1 N^{-2/(d'+4)}", linestyle = :dash, color = palette(:default)[3])
-plot!(N_vec, x -> 1e-0 * x^(-2/d′),
-    linewidth = 2, label = L"N^{-2/d'}", linestyle = :dash, color = palette(:default)[4])
+=#
+#plot!(N_vec, x -> 5e-2 * x^(-1/3),
+#    linewidth = 2, label = L"\sim \, N^{-1/3}", linestyle = :dash, color = palette(:default)[3])
+plot!(N_vec, x -> 0.1 * x^(-1),
+    linewidth = 2, label = L"N^{-1/2}", linestyle = :dash, color = palette(:default)[4])
+
 p
 savefig("figs/error_convergence.pdf")
-
-
 
 p = plot(N_vec, mean(abs.(times[1,:,:]), dims = 2),
         minorgrid = true, xlabel = L"N", ylabel = L"\mathrm{comput. time}", yaxis=:log, xaxis = :log,
