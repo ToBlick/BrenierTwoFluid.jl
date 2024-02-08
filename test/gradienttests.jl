@@ -9,7 +9,7 @@ Y .= rand(M,d) .- 0.5
 ∇S_x = zero(X)
 ∇S_y = zero(Y)
 
-for i in 1:2
+for i = 1:2
         if i == 1 # Scaling test
                 truevalue = 1/2 * d * 1/12 * offset^2 #1/2 * d * offset^2
                 Y .= (rand(M,d) .- 0.5) .* (1 + offset)
@@ -32,13 +32,13 @@ for i in 1:2
 
         if i == 1
                 @test dot(X - ∇S_x - (1 + offset) * X, α .* (X - ∇S_x - (1 + offset) * X)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))
-                #println(dot(X - ∇S_x - (1 + offset) * X, α .* (X - ∇S_x - (1 + offset) * X)))
+                println(dot(X - ∇S_x - (1 + offset) * X, α .* (X - ∇S_x - (1 + offset) * X)))
                 @test dot(Y - ∇S_y - 1/(1 + offset) * Y, β .* (Y - ∇S_y - 1/(1 + offset) * Y)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))
-                #println(dot(Y - ∇S_y - 1/(1 + offset) * Y, β .* (Y - ∇S_y - 1/(1 + offset) * Y)))
+                println(dot(Y - ∇S_y - 1/(1 + offset) * Y, β .* (Y - ∇S_y - 1/(1 + offset) * Y)))
         else
-                @test dot(∇S_x ./ α + offset * X ./ X, α .* (∇S_x ./ α + offset * X ./ X)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))
-                #println(dot(∇S_x ./ α + offset * X ./ X, α .* (∇S_x ./ α + offset * X ./ X)))
-                @test dot(∇S_y ./ β - offset * Y ./ Y, β .* (∇S_y ./ β - offset * Y ./ Y)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))
-                #println(dot(∇S_y ./ β - offset * Y ./ Y, β .* (∇S_y ./ β - offset * Y ./ Y)))
+                @test dot(∇S_x + offset * X ./ X, α .* (∇S_x + offset * X ./ X)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))
+                println(dot(∇S_x + offset * X ./ X, α .* (∇S_x + offset * X ./ X)))
+                @test dot(∇S_y - offset * Y ./ Y, β .* (∇S_y - offset * Y ./ Y)) < (sqrt(N*M))^(-4/(2*d′′ + 8)) * log(sqrt(N*M))
+                println(dot(∇S_y - offset * Y ./ Y, β .* (∇S_y - offset * Y ./ Y)))
         end
 end
