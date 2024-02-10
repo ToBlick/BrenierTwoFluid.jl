@@ -10,11 +10,12 @@ include("costs.jl")
 export LazyCost, CostCollection, c_periodic, ∇c_periodic
 
 include("sinkhornvariable.jl")
-export SinkhornVariable, initialize_potentials!, positions, density, logdensity, potential, debiasing_potential
+export SinkhornVariable, initialize_potentials_nolog!, initialize_potentials_log!
 
 include("sinkhorndivergence.jl")
 export SinkhornDivergence, SinkhornParameters, softmin, sinkhorn_step!, value, compute!, x_gradient!, x_gradient, y_gradient, y_gradient!
 export scale, maxit, tol, acceleration, marginal_error
+export initialize_potentials!
 
 include("barycenter.jl")
 export SinkhornBarycenter, compute!

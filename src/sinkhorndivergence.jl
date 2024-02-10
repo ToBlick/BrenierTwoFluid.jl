@@ -1,4 +1,4 @@
-mutable struct SinkhornParameters{T, SAFE, SYM, ACC}
+mutable struct SinkhornParameters{SAFE, SYM, ACC, T}
     Δ::T #diameter
     q::T #scaling parameter
 
@@ -19,24 +19,8 @@ mutable struct SinkhornParameters{T, SAFE, SYM, ACC}
         else
             SAFE = true
         end
-        new{T, SAFE, sym, acc}(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it)
+        new{SAFE, sym, acc, T}(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it)
     end
-end
-
-function SinkhornParameters(CC::CostCollection;
-                            Δ = maximum(CC.C_xy),
-                            q = 1.0,
-                            ω = 1.0,
-                            crit_it = 20,
-                            p_ω = 2,
-                            ε = maximum(CC.C_xy) * 1e-3,
-                            s = ε,
-                            p = 2.0,
-                            tol = 1e-6,
-                            max_it = Int(ceil(10 * Δ/ε)),
-                            sym = false,
-                            acc = true)
-    SinkhornParameters(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it, sym, acc)
 end
 
 function SinkhornParameters(;
@@ -60,39 +44,68 @@ SinkhornDivergence
 
 Struct that holds two SinkhornVariables, a CostCollection, and SinkhornParameters. This is what most functions operate and dispatch on.
 """
-struct SinkhornDivergence{T, SAFE, SYM, ACC, d, AT, VT, CT}
+struct SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
     V1::SinkhornVariable{T,d,AT,VT} #X, α, log(α), f, f₋, h, h₋
     V2::SinkhornVariable{T,d,AT,VT}
     CC::CostCollection{T,CT}        #C_xy, C_yx, C_xx, C_yy
-    params::SinkhornParameters{T, SAFE, SYM, ACC}
+    params::SinkhornParameters{SAFE, SYM, ACC, T}
+
+    function SinkhornDivergence(V::SinkhornVariable{T,d,AT,VT}, 
+                                W::SinkhornVariable{T,d,AT,VT}, 
+                                CC::CostCollection{T,CT}, 
+                                params::SinkhornParameters{SAFE, SYM, ACC, T},
+                                log) where {SAFE, SYM, ACC, T, d, AT, VT, CT}
+        new{log, SAFE, SYM, ACC, T, d, AT, VT, CT}(V, W, CC, params)
+    end
 end
 
-function SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params) where {FT<:Base.Callable}
-    SinkhornDivergence(V, W, CostCollection(V.X, W.X, c), params)
+function SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, log) where {FT<:Base.Callable}
+    CC = CostCollection(V.X, W.X, c)
+    SinkhornDivergence(V, W, CC, params, log)
 end
+
 
 #
 # Aliases
 #
 
-const SafeSinkhornDivergence = SinkhornDivergence{T, true} where {T}
-const UnsafeSinkhornDivergence = SinkhornDivergence{T, false} where {T}
-const SymmetricSinkhornDivergence = SinkhornDivergence{T, SAFE, true} where {T, SAFE}
-const AcceleratedSinkhornDivergence = SinkhornDivergence{T, SAFE, SYM, true} where {T, SAFE, SYM}
+const LogSinkhornDivergence = SinkhornDivergence{true}
+const NologSinkhornDivergence = SinkhornDivergence{false}
+
+const SafeSinkhornDivergence = SinkhornDivergence{LOG, true} where {LOG}
+const UnsafeSinkhornDivergence = SinkhornDivergence{LOG, false} where {LOG}
+
+const SymmetricSinkhornDivergence = SinkhornDivergence{LOG, SAFE, true} where {LOG, SAFE}
+const AsymmetricSinkhornDivergence = SinkhornDivergence{LOG, SAFE, false} where {LOG, SAFE}
+
+const LogSymmetricSinkhornDivergence = SinkhornDivergence{true, SAFE, true} where {SAFE}
+const NologSymmetricSinkhornDivergence = SinkhornDivergence{false, SAFE, true} where {SAFE}
+const LogAsymmetricSinkhornDivergence = SinkhornDivergence{true, SAFE, false} where {SAFE}
+const NologAsymmetricSinkhornDivergence = SinkhornDivergence{false, SAFE, false} where {SAFE}
+
+const AcceleratedSinkhornDivergence = SinkhornDivergence{LOG, SAFE, SYM, true} where {LOG, SAFE, SYM}
 
 #
 # Convenience
 #
 
-issafe(S::SinkhornDivergence{T, SAFE}) where {T,SAFE} = SAFE
-issymmetric(S::SinkhornDivergence{T, SAFE, SYM}) where {T,SAFE, SYM} = SYM
-isaccelerated(S::SinkhornDivergence{T, SAFE, SYM, ACC}) where {T, SAFE, SYM, ACC} = ACC
+islog(S::SinkhornDivergence{LOG}) where LOG = LOG
+issafe(S::SinkhornDivergence{LOG, SAFE}) where {LOG, SAFE} = SAFE
+issymmetric(S::SinkhornDivergence{LOG, SAFE, SYM}) where {LOG, SAFE, SYM} = SYM
+isaccelerated(S::SinkhornDivergence{LOG, SAFE, SYM, ACC}) where {LOG, SAFE, SYM, ACC} = ACC
 scale(S::SinkhornDivergence) = S.params.s
 max_it(S::SinkhornDivergence) = S.params.max_it
 tol(S::SinkhornDivergence) = S.params.tol
 minscale(S::SinkhornDivergence) = S.params.ε
 acceleration(S::SinkhornDivergence) = S.params.ω
 
+function initialize_potentials!(S::LogSinkhornDivergence)
+    initialize_potentials_log!(S.V1, S.V2, S.CC)
+end
+
+function initialize_potentials!(S::NologSinkhornDivergence)
+    initialize_potentials_nolog!(S.V1, S.V2, S.CC)
+end
 
 """
 softmin
@@ -121,7 +134,7 @@ sinkhorn_step!
 
 One iteration of the Sinkhorn algorithm.
 """
-function sinkhorn_step!(S::SymmetricSinkhornDivergence)
+function sinkhorn_step!(S::LogSymmetricSinkhornDivergence)
     @threads for i in eachindex(S.V1.f)
         @inbounds S.V1.f[i] = 1/2 * S.V1.f₋[i] + 1/2 * softmin(i, S.CC.C_yx, S.V2.f₋, S.V2.log_α, scale(S))
         @inbounds S.V1.h[i] = 1/2 * S.V1.h₋[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h₋, S.V1.log_α, scale(S))
@@ -138,7 +151,7 @@ function sinkhorn_step!(S::SymmetricSinkhornDivergence)
     end
 end
 
-function sinkhorn_step!(S::SinkhornDivergence)
+function sinkhorn_step!(S::LogAsymmetricSinkhornDivergence)
     @threads for i in eachindex(S.V1.f)
         @inbounds S.V1.f[i] = softmin(i, S.CC.C_yx, S.V2.f₋, S.V2.log_α, scale(S))
         @inbounds S.V1.h[i] = 1/2 * S.V1.h₋[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h₋, S.V1.log_α, scale(S))
@@ -152,6 +165,20 @@ function sinkhorn_step!(S::SinkhornDivergence)
         if isaccelerated(S)
             @inbounds S.V2.f[j] = (1 - acceleration(S)) * S.V2.f₋[j] + acceleration(S) * S.V2.f[j]
         end
+    end
+end
+
+function sinkhorn_step!(S::NologAsymmetricSinkhornDivergence)
+    ε = scale(S)
+    S.V1.f .= S.V1.α ./ ( exp.( -1 .* S.CC.C_yx ./ ε) * S.V2.f₋ )
+    S.V1.h .= sqrt.( S.V1.h₋ .* S.V1.α ./ ( exp.( -1 .* S.CC.C_xx ./ ε) * S.V1.h₋ ) )
+    if isaccelerated(S) # the symmetric problem is never accelerated
+        S.V1.f .= S.V1.f₋.^(1 - acceleration(S)) .* S.V1.f.^acceleration(S)
+    end
+    S.V2.f .= S.V2.α ./ ( exp.( -1 .* S.CC.C_xy ./ ε) * S.V1.f )
+    S.V2.h .= sqrt.( S.V2.h₋ .* S.V2.α ./ ( exp.( -1 .* S.CC.C_yy ./ ε) * S.V2.h₋ ) )
+    if isaccelerated(S) # the symmetric problem is never accelerated
+        S.V2.f .= S.V2.f₋.^(1 - acceleration(S)) .* S.V2.f.^acceleration(S)
     end
 end
 
@@ -234,13 +261,19 @@ function compute!(S::SafeSinkhornDivergence)
     return value(S)
 end
 
-function marginal_errors(S::SinkhornDivergence)
+function marginal_errors(S::LogSinkhornDivergence)
     π1_err = 0.0
     π2_err = 0.0
     # serial for now
     @inbounds for i in eachindex(S.V1.f)
         sm_i = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
-        π2_err += abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 ) * S.V1.α[i]
+        r = abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 )
+        # Linf
+        if r > π2_err
+            π2_err = r
+        end
+        # L1
+        # π2_err += r * S.V1.α[i]
     end
     @inbounds for j in eachindex(S.V2.f)
         sm_j = softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S))
@@ -249,21 +282,35 @@ function marginal_errors(S::SinkhornDivergence)
     return π1_err, π2_err
 end
 
-function marginal_error(S::SinkhornDivergence)
+function marginal_error(S::NologSinkhornDivergence)
+    return sum(abs.( S.V1.α .- S.V1.f .* ( exp.( -1 .* S.CC.C_yx ./ scale(S)) * S.V2.f ) ))
+end
+
+function marginal_error(S::LogSinkhornDivergence)
     π2_err = 0.0
     # serial for now
     @inbounds for i in eachindex(S.V1.f)
         sm_i = softmin(i, S.CC.C_yx, S.V2.f, S.V2.log_α, scale(S))
-        π2_err += abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 ) * S.V1.α[i]
+        r = abs( exp( (S.V1.f[i] - sm_i) / scale(S) ) - 1 )
+        # Linf
+        if r > π2_err
+            π2_err = r
+        end
+        # L1
+        # π2_err += r * S.V1.α[i]
     end
     return π2_err
 end
 
-function value(S::SinkhornDivergence)
+function value(S::LogSinkhornDivergence)
     return (S.V1.f - S.V1.h)' * S.V1.α + (S.V2.f - S.V2.h)' * S.V2.α
 end
 
-function x_gradient!(S::SinkhornDivergence{T,d}, ∇c) where {T,d}
+function value(S::NologSinkhornDivergence)
+    return scale(S) * ( (log.(S.V1.f) - log.(S.V1.h))' * S.V1.α + (log.(S.V2.f) .- log.(S.V2.h))' * S.V2.α )
+end
+
+function x_gradient!(S::LogSinkhornDivergence, ∇c)
     X = S.V1.X
     Y = S.V2.X
     g = S.V2.f
@@ -286,7 +333,7 @@ function x_gradient!(S::SinkhornDivergence{T,d}, ∇c) where {T,d}
     ∇S
 end
 
-function y_gradient!(S::SinkhornDivergence{T,d}, ∇c) where {T,d}
+function y_gradient!(S::LogSinkhornDivergence, ∇c)
     X = S.V1.X
     Y = S.V2.X
     g = S.V2.f
