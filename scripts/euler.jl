@@ -22,7 +22,7 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
             Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
         end
     end
-    #X .= Y #.+ rand(N,d) * δ .- δ/2   # wiggle by δ
+    X .= Y #.+ rand(N,d) * δ .- δ/2   # wiggle by δ
     X .= X[sortperm(X[:,1]), :]
     Y .= Y[sortperm(Y[:,1]), :];
 
@@ -68,7 +68,7 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
         X .+= 0.5 * Δt * V
 
         S.params.s = s  # if scaling is used it should be reset here
-        initialize_potentials!(S)
+        #initialize_potentials!(S)
         compute!(S)
         ∇S = x_gradient!(S, ∇c)
 
@@ -118,20 +118,20 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
 
 d′ = 2*floor(d/2)
-ε = 0.05    # entropic regularization parameter
-λ² = 200
+ε = 0.01    # entropic regularization parameter
+λ² = 5000
 
-N = 100^2 #Int((ceil(1e-1/ε))^(d))  
+N = 50^2 #Int((ceil(1e-1/ε))^(d))  
 #N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
 M = N #Int((ceil(N^(1/d))^d))
 
 q = 1.0         # ε-scaling rate
 Δ = 1.0         # characteristic domain size
 s = ε           # initial scale (ε)
-tol = 1e-5      # tolerance on marginals (absolute)
+tol = 1e-4      # tolerance on marginals (absolute)
 crit_it = 20 # Int(ceil(0.1 * Δ / ε))    # when to compute acceleration
 p_ω = 2         # acceleration heuristic
-T = 0.1
+T = 1.0
 
 sym = false
 acc = true
@@ -146,6 +146,8 @@ max_it = 10000
 
 S = run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit_it, p_ω, max_it, sym, acc)
 
+
+#=
 params_coarse = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=ε,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
 S = SinkhornDivergence(S.V1,S.V2,S.CC,params_coarse,true);
 scale(S)
@@ -184,3 +186,4 @@ scatter(S.V2.X[:,1], S.V2.X[:,2], λ²/2 .* S.V2.f, markersize=1)
 p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
 
 scatter(S.V2.X[:,1], S.V2.X[:,2], [p0(S.V2.X[i,:]) for i in 1:N], markersize=1)
+=#

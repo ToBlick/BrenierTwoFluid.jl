@@ -27,11 +27,11 @@ params = SinkhornParameters(ε=ε,tol=tol,sym=false,acc=true);
 
 ω = [0.5, 0.5];
 
-B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3);
+B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3, true);
 
 @time compute!(B)
 
 Vμ = SinkhornVariable(Z, μ)
 Vμ_true = SinkhornVariable(Z_true, μ)
-S = SinkhornDivergence(Vμ_true,Vμ,c,params)
+S = SinkhornDivergence(Vμ_true,Vμ,c,params,true)
 @test compute!(S) < 1e-3

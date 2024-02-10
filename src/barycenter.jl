@@ -1,14 +1,26 @@
 """
 SinkhornBarycenter
 """
-struct SinkhornBarycenter{T, SAFE, SYM, ACC, d, AT, VT, CT}
+struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
     ω::Vector{T}
-    Ss::Vector{SinkhornDivergence{T, SAFE, SYM, ACC, d, AT, VT, CT}}
+    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}}
     CCs::Vector{CostCollection{T,CT}}
     ∇c
     max_it::Int
     tol::T
     δX::AT
+
+    #=
+    function SinkhornBarycenter(ω::Vector{T}, 
+                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}}, 
+                                CCs::Vector{CostCollection{T,CT}},
+                                ∇c,
+                                max_it::Int,
+                                tol::T,
+                                δX::AT) where {LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
+        new{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}(ω, Ss, CCs, ∇c, max_it, tol, δX)
+    end
+    =#
 end
 
 function SinkhornBarycenter(ω,
@@ -17,14 +29,15 @@ function SinkhornBarycenter(ω,
                             Vs::Vector{SinkhornVariable{T,d,AT,VT}},
                             c,
                             ∇c,
-                            params::SinkhornParameters{T, SAFE, SYM, ACC},
+                            params::SinkhornParameters{SAFE, SYM, ACC, T},
                             max_it::Int,
-                            tol) where {T, SAFE, SYM, ACC, d, AT, VT}
+                            tol,
+                            islog) where {SAFE, SYM, ACC, T, d, AT, VT}
 
     log_μ = log.(μ)
 
     CCs = [ CostCollection(Xμ, Vs[i].X, c) for i in eachindex(Vs) ]
-    Ss = [ SinkhornDivergence(SinkhornVariable(Xμ, μ, log_μ), Vs[i], CCs[i], params) for i in eachindex(Vs) ]
+    Ss = [ SinkhornDivergence(SinkhornVariable(Xμ, μ, log_μ), Vs[i], CCs[i], params, islog) for i in eachindex(Vs) ]
     SinkhornBarycenter(ω, Ss, CCs, ∇c, max_it, tol, zero(Xμ))
 end
 
@@ -43,9 +56,8 @@ function compute!(B::SinkhornBarycenter)
         # the SinkhornDivergences B.Ss each hold their own representation of Vμ, sharing only positions, weights, and logarithmic weights. Hence, the following can be done fully in parallel.
         for k in eachindex(B.Ss)
             S = B.Ss[k]
-            CC = B.CCs[k]
             # S.V1 is Vμ (the kth representation), S.V2 is the kth input density
-            initialize_potentials!(S.V1,S.V2,CC) 
+            initialize_potentials!(S) 
             compute!(S)
             # now, the k B.Ss element holds W²(μ,α[k])
             # calculate δX[i] = ∂/∂Xμ[i] ( ∑ₖ ω[k] W²(μ,α[k]) ) = ∑ₖ ω[k] ∂W²(μ,α[k])/∂Xμ[i]

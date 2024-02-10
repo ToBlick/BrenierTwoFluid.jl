@@ -5,6 +5,7 @@ using Distances
 using Random
 using LinearAlgebra
 using Plots
+using Printf
 
 p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
 ∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
@@ -91,8 +92,9 @@ end
 λ_vec = [10*i for i in 1:1000]
 plt = plot()
 for i in eachindex(results)
-    plot!(λ_vec, results[i], 
-        label = "ε = $(1e-4*ceil(1e4*2^(i-1)*(v̄ * 1/2 * Δt)^2))", color=palette(:viridis,length(results))[i],
+    str = @sprintf "ε = %.2E" (2^(i-1)*(v̄ * 1/2 * Δt)^2)
+    plot!(λ_vec, results[i], minorgrid = true,
+        label = str, color=palette(:viridis,length(results))[i],
         yaxis = :log, ylabel = "|λϕ - p|₂", xlabel = "λ")
 end
 plt
@@ -102,3 +104,5 @@ scatter(S.V1.X[:,1], S.V1.X[:,2], λ_vec[k] * (ϕ .- sum(ϕ)/N), markersize=1)
 scatter!(S.V1.X[:,1], S.V1.X[:,2], p0X .- sum(p0X)/N, markersize=1)
 
 plot(λ_vec, results[1])
+
+minimum.(results)

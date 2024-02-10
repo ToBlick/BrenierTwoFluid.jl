@@ -1,10 +1,33 @@
 # compute W_2 distance between two uniform distributions
+using BrenierTwoFluid
+using Test
+using Distances
+using Random
+using LinearAlgebra
+
+c = (x,y) -> 0.5 * sqeuclidean(x,y)
+∇c = (x,y) -> x - y
+d = 3
+N = 30^2
+M = 30^2
+α = ones(N) / N
+β = ones(M) / M
+
 d′ = 2*Int(floor(d/2))
 d′′ = 2*Int(ceil(d/2))
+ε = 0.1                 # entropic regularization. √ε is a length.
+q = 1.0                 # annealing parameter
+Δ = 1.0                 # characteristic domain size
+s = ε                   # current scale: no annealing -> equals ε
+tol = 1e-8              # marginal condition tolerance
+crit_it = 20            # acceleration inferrence
+p_ω = 2
+
+offset = 0.5
 
 Random.seed!(123)
-X .= rand(N,d) .- 0.5
-Y .= rand(M,d) .- 0.5
+X = rand(N,d) .- 0.5
+Y = rand(M,d) .- 0.5
 
 ∇S_x = zero(X)
 ∇S_y = zero(Y)
@@ -23,9 +46,9 @@ for i = 1:2
         W = SinkhornVariable(Y,β)
 
         # acc, no sym
-        params = SinkhornParameters(CC;ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
-        S = SinkhornDivergence(V,W,CC,params)
-        initialize_potentials!(V,W,CC)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
+        S = SinkhornDivergence(V,W,c,params,true)
+        initialize_potentials!(S)
         valueS = compute!(S)
         ∇S_x = x_gradient!(S, ∇c)
         ∇S_y = y_gradient!(S, ∇c)

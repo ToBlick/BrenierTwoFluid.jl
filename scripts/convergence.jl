@@ -67,10 +67,10 @@ times = zero(S_vec);
             
             s = ε
 
-            params = SinkhornParameters(CC;ε=ε,q=q,Δ=Δ,s=s,crit_it=crit_it,p_ω=p_ω,tol=tol,max_it=100*Int(ceil(Δ/ε)),sym=false,acc=acc)
+            params = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=s,crit_it=crit_it,p_ω=p_ω,tol=tol,max_it=100*Int(ceil(Δ/ε)),sym=false,acc=acc)
             
-            S = SinkhornDivergence(V,W,CC,params)
-            initialize_potentials!(V,W,CC)
+            S = SinkhornDivergence(V,W,CC,params,true)
+            initialize_potentials!(S)
 
             S_vec[i,j,k], times[i,j,k] = @timed compute!(S)
         end

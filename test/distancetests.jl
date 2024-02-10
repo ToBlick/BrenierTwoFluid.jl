@@ -1,4 +1,9 @@
 # compute W_2 distance between two uniform distributions
+using BrenierTwoFluid
+using Test
+using Distances
+using Random
+using LinearAlgebra
 
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x - y
@@ -32,35 +37,41 @@ for i in 1:2
                 Y .= (rand(M,d) .- 0.5) .+ offset
         end
 
-        CC = CostCollection(X, Y, c)
         V = SinkhornVariable(X,α)
         W = SinkhornVariable(Y,β)
 
         # no acc, no sym
-        params = SinkhornParameters(CC;ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=false)
-        S = SinkhornDivergence(V,W,CC,params)
-        initialize_potentials!(V,W,CC)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=false)
+        S = SinkhornDivergence(V,W,c,params,true)
+        initialize_potentials!(S)
+        valueS = compute!(S)
+        @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
+
+        # no acc, no sym, no log
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=false)
+        S = SinkhornDivergence(V,W,c,params,false)
+        initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # acc, no sym
-        params = SinkhornParameters(CC;ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
-        S = SinkhornDivergence(V,W,CC,params)
-        initialize_potentials!(V,W,CC)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
+        S = SinkhornDivergence(V,W,c,params,true)
+        initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # acc, sym
-        params = SinkhornParameters(CC;ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=true,acc=true)
-        S = SinkhornDivergence(V,W,CC,params)
-        initialize_potentials!(V,W,CC)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=true,acc=true)
+        S = SinkhornDivergence(V,W,c,params,true)
+        initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # no acc, sym
-        params = SinkhornParameters(CC;ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=true,acc=false)
-        S = SinkhornDivergence(V,W,CC,params)
-        initialize_potentials!(V,W,CC)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=true,acc=false)
+        S = SinkhornDivergence(V,W,c,params,true)
+        initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 end

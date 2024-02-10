@@ -4,7 +4,7 @@ using LaTeXStrings
 using LinearAlgebra
 
 ### Input the .hdf5 here
-results = "runs/2024-02-09T17:56:31.321.hdf5"
+results = "runs/2024-02-10T11:05:23.868.hdf5"
 ###
 
 # read results and parameters

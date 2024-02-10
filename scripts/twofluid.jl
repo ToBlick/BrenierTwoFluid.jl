@@ -24,8 +24,8 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
 d′ = 2*floor(d/2)
 ε = 0.01     # entropic regularization parameter
-λ² = 500
-N = 32^2    # particle number
+λ² = 5000
+N = 50^2    # particle number
 M = N
 q = 1.0         # ε-scaling rate
 Δ = 1.0         # characteristic domain size
@@ -69,11 +69,11 @@ end
 params = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
 Vα  = SinkhornVariable(X, α)
 Vβ = SinkhornVariable(Y, β)
-S = SinkhornDivergence(Vα, Vβ, c, params)
+S = SinkhornDivergence(Vα, Vβ, c, params, true)
 compute!(S)
 
 t = 0
-T = 0.5     # final time
+T = 0.1     # final time
 nt = Int(ceil((T-t)/Δt))
 
 solX = [ zero(X) for i in 1:(nt) ]
@@ -83,7 +83,7 @@ solW = [ zero(V) for i in 1:(nt) ]
 solD = [ 0.0 for i in 1:(nt + 1) ]
 
 ω = [0.5, 0.5];
-B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3);
+B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3, true);
 
 for it in ProgressBar(1:nt)
 
@@ -109,7 +109,7 @@ anim = @animate for j in eachindex(solX)
     scatter(solX[j][:,1],solX[j][:,2], legend = :topright, color=:red, label = "α", xlims = (-0.55,0.55), ylims = (-0.55,0.55))
     scatter!(solY[j][:,1],solY[j][:,2],color=:green, label = "β")
 end
-gif(anim, "figs/twofluid_vortex.gif", fps = 8)
+gif(anim, "figs/twofluid_vortex.gif", fps = 1)
 
 plot(λ²/2 * solD, linewidth = 2, label = "λ² dist²")
 plot!( 1/2 * [dot(solV[i], diagm(α) * solV[i]) for i in axes(solV,1)], linewidth = 2, label = "K(α)" )
