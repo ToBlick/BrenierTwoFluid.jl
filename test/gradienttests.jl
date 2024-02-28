@@ -49,7 +49,7 @@ for i = 1:2
         params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
-        valueS = compute!(S)
+        @time valueS = compute!(S)
         ∇S_x = x_gradient!(S, ∇c)
         ∇S_y = y_gradient!(S, ∇c)
 

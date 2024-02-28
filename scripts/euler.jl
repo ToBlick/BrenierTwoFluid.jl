@@ -36,7 +36,8 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
     # calculate initial distance
     # Setup Sinkhorn
     # no scaling, no symmetrization, with acceleration
-    params = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
+    params = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=s,tol=tol,ω=1.5,
+                                crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc,tol_it=2);
     S = SinkhornDivergence(SinkhornVariable(X, α),
                            SinkhornVariable(Y, β),
                            c,params,true)
@@ -68,12 +69,23 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
         X .+= 0.5 * Δt * V
 
         S.params.s = s  # if scaling is used it should be reset here
-        #initialize_potentials!(S)
+        initialize_potentials!(S)
         compute!(S)
         ∇S = x_gradient!(S, ∇c)
 
-        # note: the gradient alrady comes divided by the weights
-        V .-= Δt .* λ² .* ∇S
+        # note: the gradient already comes divided by the weights
+        #if it == 1
+        #    V .-= Δt .* 4 * λ² .* ∇S
+        #else
+            V .-= Δt .* λ² .* ∇S
+        #end
+
+        #∇P = zero(X)
+        #for i in axes(X,1)
+        #    ∇P[i,:] .= ∇p(X[i,:])
+        #end
+
+        # println(norm(λ² .* ∇S - ∇P,2)/N)
         # exact dynamics
         #for i in axes(V,1)
         #    V[i,:] .-= Δt * ∇p(X[i,:])
@@ -118,18 +130,18 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
 
 d′ = 2*floor(d/2)
-ε = 0.01    # entropic regularization parameter
-λ² = 5000
+ε = 0.001    # entropic regularization parameter
 
-N = 50^2 #Int((ceil(1e-1/ε))^(d))  
+N = 60^2 #Int((ceil(1e-1/ε))^(d))  
 #N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
 M = N #Int((ceil(N^(1/d))^d))
 
 q = 1.0         # ε-scaling rate
 Δ = 1.0         # characteristic domain size
 s = ε           # initial scale (ε)
-tol = 1e-4      # tolerance on marginals (absolute)
-crit_it = 20 # Int(ceil(0.1 * Δ / ε))    # when to compute acceleration
+tol = 1e-3      # tolerance on marginals (absolute)
+max_it = 100
+crit_it = max_it # Int(ceil(0.1 * Δ / ε))    # when to compute acceleration
 p_ω = 2         # acceleration heuristic
 T = 1.0
 
@@ -139,14 +151,27 @@ acc = true
 seed = 123
 
 Δt = 1/50
+λ² = 2 / Δt^2
 
-max_it = 10000
+
 
 λ² * Δt^2
 
 S = run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit_it, p_ω, max_it, sym, acc)
 
+#=
+Π = Matrix(TransportPlan(S));
 
+suppΠ = zero(Π);
+for i in axes(Π,1), j in axes(Π,2)
+    suppΠ[i,j] = (S.V1.f[i] + S.V2.f[j] - S.CC.C_xy[i,j] > -5ε ? 1 : 0)
+end
+sum(suppΠ)/(N^2)
+
+svdΠ = svd(Π);
+plot(svdΠ.S ./ svdΠ.S[1], yaxis = :log)
+=#
+3
 #=
 params_coarse = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=ε,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
 S = SinkhornDivergence(S.V1,S.V2,S.CC,params_coarse,true);

@@ -16,13 +16,10 @@ results = []
 ε_vec = []
 N_vec = []
 
-Δt = 1/10
-N = 100^2
-
-for N in [100^2]
+Δt = 1/25
 
 d = 2
-#N = 50^2
+N = 50^2
 M = N
 α = ones(N) / N
 β = ones(M) / M
@@ -59,48 +56,45 @@ tol = 1e-6
 
 p_ω = 2
 
-for κ in [2^i for i in 4]
-    ε = 1e-3 # κ*(v̄ * 1/2 * Δt)^2
-    crit_it = maximum((Int(ceil(0.1 * Δ / ε)), 20))
-    s = ε
+ε = 1e-3 # κ*(v̄ * 1/2 * Δt)^2
+crit_it = maximum((Int(ceil(0.1 * Δ / ε)), 20))
+s = ε
+X .= Y .+ 1/2 * Δt .* V;
+params = SinkhornParameters(ε=ε,
+                            q=q,
+                            Δ=Δ,
+                            s=s,
+                            tol=tol,
+                            crit_it=crit_it,
+                            max_it=10000,
+                            p_ω=p_ω,
+                            sym=false,
+                            acc=true);
+S = SinkhornDivergence(SinkhornVariable(X,α),
+                    SinkhornVariable(Y,β),
+                    c,params,true);
+initialize_potentials!(S);
+@time compute!(S)
+marginal_error(S)
 
-    X .= Y .+ 1/2 * Δt .* V;
+Π = Matrix(TransportPlan(S));
+svdΠ = svd(Π);
+plot(svdΠ.S[:]./svdΠ.S[1], yaxis = :log)
 
-    params = SinkhornParameters(ε=ε,
-                                q=q,
-                                Δ=Δ,
-                                s=s,
-                                tol=tol,
-                                crit_it=crit_it,
-                                max_it=10000,
-                                p_ω=p_ω,
-                                sym=false,
-                                acc=true);
+K = exp.(-S.CC.C_xy/ε);
+svdK = svd(K);
+plot(svdK.S[:]./svdK.S[1], yaxis = :log)
 
-    S = SinkhornDivergence(SinkhornVariable(X,α),
-                        SinkhornVariable(Y,β),
-                        c,params,true);
-    initialize_potentials!(S);
-    @time compute!(S)
+global ϕ = S.V1.f - S.V1.h;
+global p0X = [p0(S.V1.X[i,:]) for i in 1:N];
+λ_vec = [10*i for i in 1:1000]
+err = [ norm(p0X .- sum(p0X)/N - λ * (ϕ .- sum(ϕ)/N), 2)/N 
+        for λ in λ_vec ];
+push!(results, err)
+push!(N_vec, N)
+push!(ε_vec, ε)
 
-    marginal_error(S)
 
-    #Π = Matrix(TransportPlan(S));
-    #svdΠ = svd(Π);
-    #plot(svdΠ.S[1:1000], yaxis = :log)
-
-    global ϕ = S.V1.f - S.V1.h;
-
-    global p0X = [p0(S.V1.X[i,:]) for i in 1:N];
-    λ_vec = [10*i for i in 1:1000]
-    err = [ norm(p0X .- sum(p0X)/N - λ * (ϕ .- sum(ϕ)/N), 2)/N 
-            for λ in λ_vec ];
-
-    push!(results, err)
-    push!(N_vec, N)
-    push!(ε_vec, ε)
-end
-end
 
 λ_vec = [10*i for i in 1:1000];
 plt = plot();

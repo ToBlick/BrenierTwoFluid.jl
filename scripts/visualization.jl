@@ -4,7 +4,7 @@ using LaTeXStrings
 using LinearAlgebra
 
 ### Input the .hdf5 here
-results = "runs/2024-02-10T11:05:23.868.hdf5"
+results = "runs/2024-02-27T23:06:20.233.hdf5"
 ###
 
 # read results and parameters
@@ -68,6 +68,7 @@ for i in eachindex(ΔV)
 end
 ΔV ./= N;
 plot(ΔV)
+savefig("figs/V_error.pdf")
 
 anim = @animate for j in axes(solX,1)
     plt = scatter(solX[j,1:div(N,3),1], solX[j,1:div(N,3),2], label = false, color = palette(:default)[1], markerstrokewidth=0, markersize = 2.5,
@@ -78,4 +79,16 @@ anim = @animate for j in axes(solX,1)
     scatter!(solX[j,div(2N,3)+1:end,1], solX[j,div(2N,3)+1:end,2], label = false, 
     color = palette(:default)[3], markerstrokewidth=0, markersize = 2.5)
 end
-gif(anim, "figs/euler.gif", fps = 8)
+gif(anim, "figs/raleigh_ttaylor.gif", fps = 8)
+
+anim = @animate for j in axes(solX,1)
+    plt = scatter()
+    for i in axes(X,1)
+        if Mass[i] == 1
+            scatter!([solX[j,i,1]], [solX[j,i,2]], label = false, markerstrokewidth=0, markersize = 2.5, color = :black)
+        else
+            scatter!([solX[j,i,1]], [solX[j,i,2]], label = false, markerstrokewidth=0, markersize = 2.5, color = :red)
+        end
+    end
+end
+gif(anim, "figs/raleigh_taylor.gif", fps = 8)
