@@ -12,14 +12,15 @@ mutable struct SinkhornParameters{SAFE, SYM, ACC, T}
     p::T #ε ∼ x^p
     tol::T #tolerance
     max_it::Int
+    tol_it::Int
 
-    function SinkhornParameters(Δ::T, q::T, ω::T, crit_it::Int, p_ω::Int, s::T, ε::T, p::T, tol::T, max_it, sym, acc) where {T}
+    function SinkhornParameters(Δ::T, q::T, ω::T, crit_it::Int, p_ω::Int, s::T, ε::T, p::T, tol::T, max_it, tol_it, sym, acc) where {T}
         if tol == Inf
             SAFE = false
         else
             SAFE = true
         end
-        new{SAFE, sym, acc, T}(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it)
+        new{SAFE, sym, acc, T}(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it, tol_it)
     end
 end
 
@@ -34,9 +35,10 @@ function SinkhornParameters(;
     p = 2.0,
     tol = 1e-6,
     max_it = Int(ceil(10 * Δ/ε)),
+    tol_it = 2,
     sym = false,
     acc = true)
-SinkhornParameters(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it, sym, acc)
+SinkhornParameters(Δ, q, ω, crit_it, p_ω, s, ε, p, tol, max_it, tol_it, sym, acc)
 end
 
 """
@@ -64,7 +66,6 @@ function SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, par
     SinkhornDivergence(V, W, CC, params, log)
 end
 
-
 #
 # Aliases
 #
@@ -78,12 +79,21 @@ const UnsafeSinkhornDivergence = SinkhornDivergence{LOG, false} where {LOG}
 const SymmetricSinkhornDivergence = SinkhornDivergence{LOG, SAFE, true} where {LOG, SAFE}
 const AsymmetricSinkhornDivergence = SinkhornDivergence{LOG, SAFE, false} where {LOG, SAFE}
 
+const AcceleratedSinkhornDivergence = SinkhornDivergence{LOG, SAFE, SYM, true} where {LOG, SAFE, SYM}
+
 const LogSymmetricSinkhornDivergence = SinkhornDivergence{true, SAFE, true} where {SAFE}
 const NologSymmetricSinkhornDivergence = SinkhornDivergence{false, SAFE, true} where {SAFE}
 const LogAsymmetricSinkhornDivergence = SinkhornDivergence{true, SAFE, false} where {SAFE}
 const NologAsymmetricSinkhornDivergence = SinkhornDivergence{false, SAFE, false} where {SAFE}
 
-const AcceleratedSinkhornDivergence = SinkhornDivergence{LOG, SAFE, SYM, true} where {LOG, SAFE, SYM}
+
+function getLogSinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters) where {FT<:Base.Callable}
+    SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, true)
+end
+
+function getNologSinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters) where {FT<:Base.Callable}
+    SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, false)
+end
 
 #
 # Convenience
@@ -96,6 +106,7 @@ isaccelerated(S::SinkhornDivergence{LOG, SAFE, SYM, ACC}) where {LOG, SAFE, SYM,
 scale(S::SinkhornDivergence) = S.params.s
 max_it(S::SinkhornDivergence) = S.params.max_it
 tol(S::SinkhornDivergence) = S.params.tol
+tol_it(S::SinkhornDivergence) = S.params.tol_it
 minscale(S::SinkhornDivergence) = S.params.ε
 acceleration(S::SinkhornDivergence) = S.params.ω
 
@@ -206,6 +217,7 @@ function compute!(S::UnsafeSinkhornDivergence)
                 r_p = marginal_error(S)
             elseif it == S.params.crit_it
                 θ²_est = (marginal_error(S)/r_p)^(1/S.params.p_ω)
+                println(θ²_est)
                 if θ²_est >= 1
                     θ²_est = 0.95 # θ² can be larger than one if the estimate is bad, which would lead to complex ω
                 end
@@ -229,9 +241,17 @@ function compute!(S::SafeSinkhornDivergence)
         sinkhorn_step!(S)
 
         # tolerance criterion: marginal violation
-        if it % 5 == 0 # TODO: make this 5 a parameter
+        #=
+        if it % tol_it(S) == 0
             # we check only one marginal because there is no reason they should be different. When using no acceleration and no symmetrization, π1_err == 0 anyway
             if marginal_error(S) < tol(S)
+                break
+            end
+        end
+        =#
+        # tolerance criterion: update of dual potentials
+        if it % tol_it(S) == 0
+            if norm(S.V1.f₋ - S.V1.f) < tol(S) * norm(S.V1.f₋)
                 break
             end
         end
@@ -250,6 +270,7 @@ function compute!(S::SafeSinkhornDivergence)
                 r_p = marginal_error(S)
             elseif it == S.params.crit_it
                 θ²_est = (marginal_error(S)/r_p)^(1/S.params.p_ω)
+                println(θ²_est)
                 if θ²_est >= 1
                     θ²_est = 0.95 # θ² can be larger than one if the estimate is bad, which would lead to complex ω
                 end
