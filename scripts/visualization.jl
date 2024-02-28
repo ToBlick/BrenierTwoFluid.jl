@@ -4,7 +4,7 @@ using LaTeXStrings
 using LinearAlgebra
 
 ### Input the .hdf5 here
-results = "runs/2024-02-27T23:06:20.233.hdf5"
+results = "runs/2024-02-28T15:21:18.126.hdf5"
 ###
 
 # read results and parameters
@@ -79,16 +79,19 @@ anim = @animate for j in axes(solX,1)
     scatter!(solX[j,div(2N,3)+1:end,1], solX[j,div(2N,3)+1:end,2], label = false, 
     color = palette(:default)[3], markerstrokewidth=0, markersize = 2.5)
 end
-gif(anim, "figs/raleigh_ttaylor.gif", fps = 8)
+gif(anim, "figs/euler.gif", fps = 8)
 
-anim = @animate for j in axes(solX,1)
-    plt = scatter()
-    for i in axes(X,1)
-        if Mass[i] == 1
-            scatter!([solX[j,i,1]], [solX[j,i,2]], label = false, markerstrokewidth=0, markersize = 2.5, color = :black)
-        else
-            scatter!([solX[j,i,1]], [solX[j,i,2]], label = false, markerstrokewidth=0, markersize = 2.5, color = :red)
-        end
+massvec = []
+nomassvec = []
+for i in axes(solX,2)
+    if color[i] == 1
+        push!(nomassvec, i)
+    else
+        push!(massvec, i)
     end
+end
+anim = @animate for j in axes(solX,1)
+    scatter([solX[j,nomassvec,1]], [solX[j,nomassvec,2]], label = false, markerstrokewidth=0, markersize = 2.5, color = :black, xlims = (-0.55,0.55), ylims = (-0.55,0.55))
+    scatter!([solX[j,massvec,1]], [solX[j,massvec,2]], label = false, markerstrokewidth=0, markersize = 2.5, color = :red, xlims = (-0.55,0.55), ylims = (-0.55,0.55))
 end
 gif(anim, "figs/raleigh_taylor.gif", fps = 8)

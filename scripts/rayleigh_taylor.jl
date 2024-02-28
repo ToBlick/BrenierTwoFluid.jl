@@ -24,7 +24,7 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 d′ = 2*floor(d/2)
 ε = 0.001    # entropic regularization parameter
 
-N = 40^2 #Int((ceil(1e-1/ε))^(d))  
+N = 60^2 #Int((ceil(1e-1/ε))^(d))  
 #N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
 M = N #Int((ceil(N^(1/d))^d))
 
@@ -41,7 +41,7 @@ acc = true
 
 seed = 123
 
-Δt = 1/200
+Δt = 1/100
 
     Random.seed!(seed)
 
@@ -62,8 +62,8 @@ seed = 123
 
     Mass = ones(N)
     for i in axes(X,1)
-        if X[i,2] > 0.3 * cos(2π*X[i,1])
-            Mass[i] = 3
+        if X[i,2] > 0.1 * cos(2π*X[i,1])
+            Mass[i] = 2
         end
     end
     G = zero(X)
@@ -145,7 +145,7 @@ seed = 123
 
 nt
 
-j = 100
+j = nt
 
     plt = scatter()
     for i in axes(solX[j],1)
