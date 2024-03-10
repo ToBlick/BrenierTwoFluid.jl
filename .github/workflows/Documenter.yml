@@ -4,21 +4,18 @@ on:
   push:
     branches:
       - main
-    tags: '*'
   pull_request:
 
 jobs:
   build:
+    name: Documentation
     permissions: write-all
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v3
+      - uses: julia-actions/setup-julia@latest
         with:
           version: '1'
-      - uses: julia-actions/cache@v1
-        with:
-          cache-compiled: "true"
       - run: |
           julia --project=docs docs/make.jl html_output
       - uses: julia-actions/julia-buildpkg@v1
