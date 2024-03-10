@@ -17,7 +17,11 @@ jobs:
         with:
           version: '1'
       - name: Install dependencies
-        run: julia --project=docs/ -e 'using Pkg; Pkg.add(url="https://github.com/ToBlick/BrenierTwoFluid.jl"); Pkg.instantiate()'
+        run: julia --project=docs/ -e '
+             using Pkg
+             Pkg.add(url="https://github.com/ToBlick/BrenierTwoFluid.jl") 
+             Pkg.instantiate()
+             '
       - run: |
           julia --project=docs docs/make.jl html_output
       - uses: julia-actions/julia-buildpkg@v1
