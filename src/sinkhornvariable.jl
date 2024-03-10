@@ -1,5 +1,7 @@
 """
-SinkhornVariable
+    SinkhornVariable
+
+    
 
 holds particle positions, weights, logarithm of the weights, potential and de-biasing potential, as well as those from the previous iteration
 """

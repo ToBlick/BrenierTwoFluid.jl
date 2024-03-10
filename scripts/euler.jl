@@ -22,7 +22,7 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
             Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
         end
     end
-    X .= Y #.+ rand(N,d) * δ .- δ/2   # wiggle by δ
+    X .= Y .+ randn(N,d) * 1/(N)   # wiggle by δ
     X .= X[sortperm(X[:,1]), :]
     Y .= Y[sortperm(Y[:,1]), :];
 
@@ -63,9 +63,14 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
     solD[1] = value(S)
     sol∇S[1] = copy(x_gradient!(S, ∇c));
 
+    X₋ = zero(X)
+
     # integrate
     for it in ProgressBar(1:nt)
 
+        #X₋ .= X
+
+        #X .+= Δt * V
         X .+= 0.5 * Δt * V
 
         S.params.s = s  # if scaling is used it should be reset here
@@ -91,6 +96,7 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
         #    V[i,:] .-= Δt * ∇p(X[i,:])
         #end
 
+        #X .= X₋ .+ Δt .* V
         X .+= 0.5 .* Δt .* V
 
         # diagnostics
@@ -130,9 +136,9 @@ c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x-y
 
 d′ = 2*floor(d/2)
-ε = 0.001    # entropic regularization parameter
+ε = 0.01    # entropic regularization parameter
 
-N = 60^2 #Int((ceil(1e-1/ε))^(d))  
+N = 40^2 #Int((ceil(1e-1/ε))^(d))  
 #N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
 M = N #Int((ceil(N^(1/d))^d))
 
@@ -171,7 +177,7 @@ sum(suppΠ)/(N^2)
 svdΠ = svd(Π);
 plot(svdΠ.S ./ svdΠ.S[1], yaxis = :log)
 =#
-3
+
 #=
 params_coarse = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=ε,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
 S = SinkhornDivergence(S.V1,S.V2,S.CC,params_coarse,true);

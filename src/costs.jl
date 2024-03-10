@@ -1,4 +1,3 @@
-
 struct LazyCost{T, d, AT <: AbstractArray{T,d}, FT <: Base.Callable} <: AbstractMatrix{T}
     x::AT # N × d
     y::AT

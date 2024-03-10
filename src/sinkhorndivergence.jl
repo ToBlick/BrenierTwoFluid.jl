@@ -194,7 +194,7 @@ function sinkhorn_step!(S::NologAsymmetricSinkhornDivergence)
 end
 
 """
-compute!
+    compute!(S::UnsafeSinkhornDivergence)
 
 Solve the OT problem, i.e. do a bunch of Sinkhorn interations. Unsafe version.
 """
@@ -217,7 +217,7 @@ function compute!(S::UnsafeSinkhornDivergence)
                 r_p = marginal_error(S)
             elseif it == S.params.crit_it
                 θ²_est = (marginal_error(S)/r_p)^(1/S.params.p_ω)
-                println(θ²_est)
+                # println(θ²_est)
                 if θ²_est >= 1
                     θ²_est = 0.95 # θ² can be larger than one if the estimate is bad, which would lead to complex ω
                 end
@@ -230,7 +230,7 @@ function compute!(S::UnsafeSinkhornDivergence)
 end
 
 """
-compute!
+    compute!(S::SafeSinkhornDivergence)
 
 Solve the OT problem, i.e. do a bunch of Sinkhorn interations. Safe version.
 """
@@ -270,7 +270,7 @@ function compute!(S::SafeSinkhornDivergence)
                 r_p = marginal_error(S)
             elseif it == S.params.crit_it
                 θ²_est = (marginal_error(S)/r_p)^(1/S.params.p_ω)
-                println(θ²_est)
+                # println(θ²_est)
                 if θ²_est >= 1
                     θ²_est = 0.95 # θ² can be larger than one if the estimate is bad, which would lead to complex ω
                 end

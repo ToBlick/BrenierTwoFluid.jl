@@ -1,5 +1,7 @@
 """
-SinkhornBarycenter
+    SinkhornBarycenter
+
+A type representing a Sinkhorn barycenter problem.
 """
 struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
     ω::Vector{T}

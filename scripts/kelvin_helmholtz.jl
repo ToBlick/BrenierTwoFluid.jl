@@ -66,7 +66,7 @@ c = (x,y) -> c_periodic_x(x,y,D)
 d′ = 2*floor(d/2)
 ε = 0.001    # entropic regularization parameter
 
-N = 50^2 #Int((ceil(1e-1/ε))^(d))  
+N = 70^2 #Int((ceil(1e-1/ε))^(d))  
 #N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
 M = N #Int((ceil(N^(1/d))^d))
 
@@ -101,7 +101,7 @@ X .= Y
 X .= X[sortperm(X[:,1]), :]
 Y .= Y[sortperm(Y[:,1]), :];
 
-shear(x) = 0.05 * cos(x[1]*2π*4)
+shear(x) = 0.1 * cos(x[1]*2π*4)
 color = ones(N)
 for i in axes(X,1)
     if X[i,2] < shear(X[i,1]) 
@@ -130,7 +130,7 @@ K₀ = 0.5 * dot(V,diagm(α) * V) #0.25    # initial kinetic energy
 λ² = 2 * Δt^-2 # 2*K₀/(δ^2) # 2*K₀/(δ^2 - valS)                  # relaxation to enforce dist < δ
       
 t = 0
-T = 0.5     # final time
+T = 0.25     # final time
 nt = Int(ceil((T-t)/Δt))
 p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
 ∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
