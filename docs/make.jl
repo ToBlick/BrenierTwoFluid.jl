@@ -25,7 +25,6 @@ const output_type = isempty(ARGS) ? :html : ARGS[1] == "latex_output" ? :latex :
 const format = output_type == :latex ? latex_format : html_format
 
 makedocs(;
-    plugins = [bib],
     modules = [BrenierTwoFluid],
     authors = "Tobias Blickhan",
     repo = "https://github.com/ToBlick/BrenierTwoFluid.jl/blob/{commit}{path}#L{line}",
