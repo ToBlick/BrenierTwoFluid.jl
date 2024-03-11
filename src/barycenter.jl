@@ -1,7 +1,19 @@
 """
     SinkhornBarycenter
 
-A type representing a Sinkhorn barycenter problem.
+    Represents a Sinkhorn barycenter problem.
+
+    Fields:
+    - `ω::Vector{T}`: weights of the input distributions.
+    - `Ss::Vector{SinkhornDivergence}`: Sinkhorn divergences between the input distributions and the barycenter.
+    - `CCs::Vector{CostCollection}`: cost collections for the Sinkhorn divergences.
+    - `∇c`: gradient of the cost function.
+    - `max_it::Int`: maximum number of iterations. This can be different from the maximum number of iterations of the Sinkhorn divergences, typically it is much smaller.
+    - `tol::T`: tolerance for the stopping criterion. This can be different from the tolerance of the Sinkhorn divergences.
+    - `δX::AT`: gradient of the barycenter problem with respect to the positions of the particles representing the barycenter.
+
+    Type parameters:
+    - `LOG, SAFE, SYM, ACC`: As in `SinkhornDivergence` and in fact identical to those values of the contained `SinkhornDivergence` objects.
 """
 struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
     ω::Vector{T}
@@ -11,18 +23,6 @@ struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
     max_it::Int
     tol::T
     δX::AT
-
-    #=
-    function SinkhornBarycenter(ω::Vector{T}, 
-                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}}, 
-                                CCs::Vector{CostCollection{T,CT}},
-                                ∇c,
-                                max_it::Int,
-                                tol::T,
-                                δX::AT) where {LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
-        new{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}(ω, Ss, CCs, ∇c, max_it, tol, δX)
-    end
-    =#
 end
 
 function SinkhornBarycenter(ω,
@@ -82,49 +82,3 @@ function compute!(B::SinkhornBarycenter)
         end
     end
 end
-
-#=
-function barycenter_sinkhorn!(ω, Vμ ,V_vec, CC_vec, ∇c, params, maxit, tol)
-
-    S_vec = [SinkhornDivergence(Vμ, V_vec[s], CC_vec[s]; ε=params.ε, q=params.q, Δ=params.Δ, tol=params.tol) 
-                for s in eachindex(V_vec)]
-    ∇S_μ_vec = [zero(Vμ.X) for _ in V_vec]
-    ∇S_α_vec = [zero(V.X) for V in V_vec]
-    N = size(Vμ.X, 1)
-
-    for i in 1:maxit
-        for s in eachindex(S_vec)
-            S = S_vec[s]
-            S.params.s = params.Δ
-            initialize_potentials!(S.V1,S.V2,CC_vec[s])
-            compute!(S)
-            x_gradient!(∇S_μ_vec[s], S, ∇c)
-        end
-
-        δX = (ω' * ∇S_μ_vec) ./ Vμ.α
-        #println(norm(δX)^2/N)
-
-        if norm(δX)^2/N < tol^2
-            println("terminated at i = $i")
-            for s in eachindex(S_vec)
-                S = S_vec[s]
-                y_gradient!(∇S_α_vec[s], S, ∇c)
-            end
-            return Vμ, ω' * [value(S) for S in S_vec], ∇S_α_vec
-        else
-            Vμ.X .-= δX
-        end
-    end
-
-    for s in eachindex(S_vec)
-        S = S_vec[s]
-        S.params.s = params.Δ
-        initialize_potentials!(S.V1,S.V2,CC_vec[s])
-        compute!(S)
-        x_gradient!(∇S_μ_vec[s], S, ∇c)
-        y_gradient!(∇S_α_vec[s], S, ∇c)
-    end
-
-    return Vμ, ω' * [value(S) for S in S_vec], ∇S_α_vec
-end
-=#

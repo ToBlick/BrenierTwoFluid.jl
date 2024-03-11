@@ -21,16 +21,13 @@ q = 1.0                 # annealing parameter
 s = ε                   # current scale: no annealing -> equals ε
 tol = 1e-8              # marginal condition tolerance
 crit_it = 20            # acceleration inferrence
-p_ω = 2
+p_η = 2
 
 offset = 0.5
 
 Random.seed!(123)
 X = rand(N,d) .- 0.5
 Y = rand(M,d) .- 0.5
-
-∇S_x = zero(X)
-∇S_y = zero(Y)
 
 for i = 1:2
         if i == 1 # Scaling test
@@ -46,7 +43,7 @@ for i = 1:2
         W = SinkhornVariable(Y,β)
 
         # acc, no sym
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=false,acc=true)
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
         @time valueS = compute!(S)

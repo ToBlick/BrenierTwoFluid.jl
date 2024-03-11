@@ -1,3 +1,13 @@
+"""
+    LazyCost
+
+    AbstractMatrix type that represents a cost matrix between two point clouds `x` and `y`. The cost matrix is not computed until it is indexed.
+
+    Fields:
+    - `x::AT`: N × d `AbstractArray` of points.
+    - `y::AT`: M × d `AbstractArray` of points.
+    - `c::FT`: `Callable` scalar cost function `x,y -> c(x,y)`. The default is 1/2 times the squared Euclidean distance.
+"""
 struct LazyCost{T, d, AT <: AbstractArray{T,d}, FT <: Base.Callable} <: AbstractMatrix{T}
     x::AT # N × d
     y::AT
@@ -12,6 +22,17 @@ Base.getindex(C::LazyCost{T,1}, i, j) where {T} = C.c(C.x[i], C.y[j])::T
 Base.getindex(C::LazyCost{T}, i, j) where {T} = @views C.c(C.x[i,:], C.y[j,:])::T
 Base.size(C::LazyCost) = (size(C.x,1), size(C.y,1))
 
+"""
+    CostCollection
+
+    Collection of cost matrices involving two point clouds `X` and `Y`. 
+
+    Fields:
+    - `C_xy::CT`: N × M `AbstractMatrix`.
+    - `C_yx::CT`: M × N `AbstractMatrix`.
+    - `C_xx::CT`: N × N `AbstractMatrix`.
+    - `C_yy::CT`: M × M `AbstractMatrix`.
+"""
 struct CostCollection{T, CT <: AbstractMatrix{T}}
     C_xy::CT
     C_yx::CT

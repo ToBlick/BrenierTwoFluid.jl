@@ -20,7 +20,7 @@ q = 1.0                 # annealing parameter
 s = ε                   # current scale: no annealing -> equals ε
 tol = 1e-8              # marginal condition tolerance
 crit_it = 20            # acceleration inferrence
-p_ω = 2
+p_η = 2
 
 offset = 0.5
 
@@ -41,35 +41,35 @@ for i in 1:2
         W = SinkhornVariable(Y,β)
 
         # no acc, no sym
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=false)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=false,acc=false)
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # no acc, no sym, no log
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=false)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=false,acc=false)
         S = SinkhornDivergence(V,W,c,params,false)
         initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # acc, no sym
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=false,acc=true)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=false,acc=true)
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # acc, sym
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=true,acc=true)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=true,acc=true)
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
         valueS = compute!(S)
         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
 
         # no acc, sym
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_ω=p_ω,sym=true,acc=false)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=true,acc=false)
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
         valueS = compute!(S)
