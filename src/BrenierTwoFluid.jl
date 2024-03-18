@@ -30,10 +30,10 @@ export TransportPlan, transportmatrix
 include("plotting.jl")
 export plot
 
-include("rbf.jl")
-export bspline, kde
+#include("rbf.jl")
+#export bspline, kde
 
-include("resampling.jl")
-export resample!
+#include("resampling.jl")
+#export resample!
 
 end
