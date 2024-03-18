@@ -8,50 +8,96 @@ using ProgressBars
 using HDF5
 using Dates
 
-function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit_it, p_ω, max_it, sym, acc)
-    Random.seed!(seed)
 
-    # initial conditions - identical
+### Set output file
+const PATH_OUT = "runs/$(now()).hdf5"
+###
+
+### parameters
+const d = 2
+const c = (x,y) -> 0.5 * sqeuclidean(x,y)
+const ∇c = (x,y) -> x-y
+
+const N = 30^2
+const M = 30^2
+
+const DOMAIN = (1.0, 1.0)   # only cubes for now
+
+const T = 1.0               # final time
+
+const ENTROPIC_REG = 0.1 * N^(-1/3)    # entropic regularization parameter ε
+
+const SCALING_RATE = 1.0    # ε-scaling rate
+const R = 0.5 * sum([l^2 for l in DOMAIN])   # L infinity norm of the cost function
+const INITIAL_SCALE = ENTROPIC_REG     # initial scale (ε for no scaling, C_INFTY otherwise)
+const SINKHORN_TOLERANCE = 1e-3   # tolerance to end the Sinkhorn iterations. Relative change of the dual potentials. L_inf norm of the marginals violations is also an option.
+const SINKHORN_MAX_IT = 100 # maximum number of Sinkhorn iterations
+const ACCELERATION_IT = 20  # when to compute acceleration. Set this to SINKHORN_MAX_IT + 1 when using a fixed, given value for the acceleration parameter.
+const INITIAL_ETA = 1.5     # initial value for the acceleration parameter
+const ACCELERATION_P = 2    # acceleration is computed using the difference of the value at ACCELERATION_IT - ACCELERATION_P and at ACCELERATION_IT.
+const TOLERANCE_FREQUENCY = 2 # how often to check the tolerance
+
+const PRECISE_DIAGNOSTICS = false # whether to re-compute the Sinkhorn divergence at the end of each time step
+
+const SYM = false           # symmetrization
+const ACC = true            # acceleration
+const LOG = false            # log-domain
+const DEB = true            # debiasing
+const SAFE = true           # safe stopping criterion versus fixed heuristic number of iterations
+
+const SEED = 123            # for reproducibility
+
+const DELTA_T = 1/50                    # time step
+const LAMBDA_SQUARE = 2 / (DELTA_T^2)   # relaxation parameter
+
+const X_ON_GRID = true
+const Y_ON_GRID = true
+
+const u0(x) = [-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2])]
+const p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
+const ∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
+
+function run_euler()
+    Random.seed!(SEED)
+
     α = ones(N) / N
     β = ones(M) / M
-    X = rand(N,d) .- 0.5;
-    Y = rand(M,d) .- 0.5;
-    #  uniform grid for background density
-    for k in 1:Int(sqrt(M))
-        for l in 1:Int(sqrt(M))
-            Y[(k-1)*Int(sqrt(M)) + l,:] .= [ k/(Int(sqrt(M))) - 1/(2*Int(sqrt(M))), l/(Int(sqrt(M))) - 1/(2*Int(sqrt(M)))] .- 1/2
-        end
-    end
-    X .= Y .+ randn(N,d) * 1/(N)   # wiggle by δ
-    X .= X[sortperm(X[:,1]), :]
-    Y .= Y[sortperm(Y[:,1]), :];
+    Y = stack(vec([ [x,y] for x in range(-0.5,0.5,length=Int(sqrt(M))), y in range(-0.5,0.5,length=Int(sqrt(M))) ]), dims = 1)
+    X = stack(vec([ [x,y] for x in range(-0.5,0.5,length=Int(sqrt(N))), y in range(-0.5,0.5,length=Int(sqrt(N))) ]), dims = 1)
+    X_ON_GRID ? nothing : X = rand(N,d) .- 0.5
+    Y_ON_GRID ? nothing : Y = rand(M,d) .- 0.5
 
     # initial velocity
-    u0(x) = [-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2])]
     V = zero(X)
-    for i in axes(X)[1]
-        V[i,:] .= u0(X[i,:])
-    end
+    for i in axes(X)[1] V[i,:] .= u0(X[i,:]) end
 
-    # calculate initial distance
     # Setup Sinkhorn
-    # no scaling, no symmetrization, with acceleration
-    params = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=s,tol=tol,ω=1.5,
-                                crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc,tol_it=2);
+    params = SinkhornParameters(ε=ENTROPIC_REG,
+                                q=SCALING_RATE,
+                                Δ=R,
+                                s=INITIAL_SCALE,
+                                tol=SINKHORN_TOLERANCE,
+                                η=INITIAL_ETA,
+                                crit_it=ACCELERATION_IT,
+                                p_η=ACCELERATION_P,
+                                max_it=SINKHORN_MAX_IT,
+                                tol_it=TOLERANCE_FREQUENCY,
+                                sym=SYM,
+                                acc=ACC,
+                                deb=DEB,
+                                safe=SAFE,
+                                );
     S = SinkhornDivergence(SinkhornVariable(X, α),
                            SinkhornVariable(Y, β),
-                           c,params,true)
+                           c,
+                           params,
+                           LOG)
     initialize_potentials!(S)
-    valS = compute!(S)
-
-    #K₀ = 0.5 * dot(V,diagm(α) * V) #0.25    # initial kinetic energy
-    #λ² = (Δt)^(-2) # 2*K₀/(δ^2) # 2*K₀/(δ^2 - valS)                  # relaxation to enforce dist < δ
+    compute!(S)
           
     t = 0
+    Δt = DELTA_T
     nt = Int(ceil((T-t)/Δt))
-
-    p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
-    ∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
 
     solX = [ zero(X) for i in 1:(nt + 1) ]
     solV = [ zero(V) for i in 1:(nt + 1) ]
@@ -61,109 +107,57 @@ function run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit
     solX[1] = copy(X)
     solV[1] = copy(V)
     solD[1] = value(S)
-    sol∇S[1] = copy(x_gradient!(S, ∇c));
-
-    X₋ = zero(X)
-
+    sol∇S[1] = copy(x_gradient!(S, ∇c))
     # integrate
     for it in ProgressBar(1:nt)
 
-        #X₋ .= X
-
-        #X .+= Δt * V
         X .+= 0.5 * Δt * V
 
-        S.params.s = s  # if scaling is used it should be reset here
+        SCALING_RATE == 1.0 ? nothing : set_scale!(S, INITIAL_SCALE)
+
         initialize_potentials!(S)
         compute!(S)
         ∇S = x_gradient!(S, ∇c)
 
-        # note: the gradient already comes divided by the weights
-        #if it == 1
-        #    V .-= Δt .* 4 * λ² .* ∇S
-        #else
-            V .-= Δt .* λ² .* ∇S
-        #end
-
-        #∇P = zero(X)
-        #for i in axes(X,1)
-        #    ∇P[i,:] .= ∇p(X[i,:])
-        #end
-
-        # println(norm(λ² .* ∇S - ∇P,2)/N)
-        # exact dynamics
-        #for i in axes(V,1)
-        #    V[i,:] .-= Δt * ∇p(X[i,:])
-        #end
-
-        #X .= X₋ .+ Δt .* V
+        V .-= Δt .* λ² .* ∇S
+        
         X .+= 0.5 .* Δt .* V
 
-        # diagnostics
-        #initialize_potentials!(V1,V2,CC)
-        #compute!(S)
+        if PRECISE_DIAGNOSTICS
+            initialize_potentials!(S)
+            compute!(S)
+            ∇S = x_gradient!(S, ∇c)
+        end
+
         solX[1+it] = copy(X)
         solV[1+it] = copy(V)
         solD[1+it] = value(S)
         sol∇S[1+it] = copy(x_gradient!(S, ∇c))
+        sol_species[1+it] = copy(species)
+        sol_alpha[1+it] = copy(α)
     end
 
     fid = h5open(path, "w")
     fid["X"] = [ solX[i][j,k] for i in eachindex(solX), j in axes(X,1), k in axes(X,2) ];
     fid["V"] = [ solV[i][j,k] for i in eachindex(solV), j in axes(V,1), k in axes(V,2) ];
     fid["D"] = solD
-    fid["alpha"] = α
+    fid["alpha"] = [ sol_alpha[i][j] for i in eachindex(sol_alpha), j in axes(α,1) ];
+    fid["species"] = [ sol_species[i][j] for i in eachindex(sol_species), j in axes(species,1) ]
     fid["beta"] = α
     fid["grad"] = [ sol∇S[i][j,k] for i in eachindex(sol∇S), j in axes(X,1), k in axes(X,2) ];
     fid["lambda"] = sqrt(λ²)
     fid["epsilon"] = ε
     fid["tol"] = tol
     fid["crit_it"] = crit_it
-    fid["p"] = p_ω
+    fid["p"] = p_η
     fid["deltat"] = Δt
     close(fid)
 
     return S
 end
 
-### Set output file
-path = "runs/$(now()).hdf5"
-###
 
-### parameters
-d = 2
-c = (x,y) -> 0.5 * sqeuclidean(x,y)
-∇c = (x,y) -> x-y
-
-d′ = 2*floor(d/2)
-ε = 0.01    # entropic regularization parameter
-
-N = 40^2 #Int((ceil(1e-1/ε))^(d))  
-#N = Int((ceil(1e-2/ε))^(d′+4))                  # particle number
-M = N #Int((ceil(N^(1/d))^d))
-
-q = 1.0         # ε-scaling rate
-Δ = 1.0         # characteristic domain size
-s = ε           # initial scale (ε)
-tol = 1e-3      # tolerance on marginals (absolute)
-max_it = 100
-crit_it = max_it # Int(ceil(0.1 * Δ / ε))    # when to compute acceleration
-p_ω = 2         # acceleration heuristic
-T = 1.0
-
-sym = false
-acc = true
-
-seed = 123
-
-Δt = 1/50
-λ² = 2 / Δt^2
-
-
-
-λ² * Δt^2
-
-S = run_euler(path, d, c, ∇c, seed, Δt, T, λ², ε, q, Δ, s, tol, crit_it, p_ω, max_it, sym, acc)
+S = run_euler()
 
 #=
 Π = Matrix(TransportPlan(S));
@@ -179,7 +173,7 @@ plot(svdΠ.S ./ svdΠ.S[1], yaxis = :log)
 =#
 
 #=
-params_coarse = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=ε,tol=tol,crit_it=crit_it,p_ω=p_ω,max_it=max_it,sym=sym,acc=acc);
+params_coarse = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=ε,tol=tol,crit_it=crit_it,p_η=p_η,max_it=max_it,sym=sym,acc=acc);
 S = SinkhornDivergence(S.V1,S.V2,S.CC,params_coarse,true);
 scale(S)
 initialize_potentials!(S);
