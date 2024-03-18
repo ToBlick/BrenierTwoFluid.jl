@@ -18,8 +18,9 @@
     - `SAFE`: whether or not the stopping criterion is checked rather than just doing a certain amount of iterations. This is set to `false` only if `tol == Inf`.
     - `SYM`: whether or not the Sinkhorn algorithm is symmetrized, i.e. f ← 0.5f₋ + 0.5f₊.
     - `ACC`: whether or not the Sinkhorn algorithm is accelerated, i.e. f ← (1-η)f₋ + ηf₊.
+    - `DEB`: whether or not the Sinkhorn algorithm is debiased, i.e. computing W₂(μ,ν) - (W₂(μ,μ) + W₂(ν,ν))/2.
 """
-mutable struct SinkhornParameters{SAFE, SYM, ACC, T}
+mutable struct SinkhornParameters{SAFE, SYM, ACC, DEB, T}
     Δ::T
     q::T
 
@@ -35,8 +36,8 @@ mutable struct SinkhornParameters{SAFE, SYM, ACC, T}
     max_it::Int
     tol_it::Int
 
-    function SinkhornParameters(Δ::T, q::T, η::T, crit_it::Int, p_η::Int, s::T, ε::T, p::T, tol::T, max_it, tol_it, safe, sym, acc) where {T}
-        new{safe, sym, acc, T}(Δ, q, η, crit_it, p_η, s, ε, p, tol, max_it, tol_it)
+    function SinkhornParameters(Δ::T, q::T, η::T, crit_it::Int, p_η::Int, s::T, ε::T, p::T, tol::T, max_it, tol_it, safe, sym, acc, deb) where {T}
+        new{safe, sym, acc, deb, T}(Δ, q, η, crit_it, p_η, s, ε, p, tol, max_it, tol_it)
     end
 end
 
@@ -52,8 +53,11 @@ function SinkhornParameters(;
         tol = 1e-6,
         max_it = Int(ceil(10 * Δ/ε)),
         tol_it = 2,
+        safe = true,
         sym = false,
-        acc = true)
-    safe = (tol != Inf)
-    SinkhornParameters(Δ, q, η, crit_it, p_η, s, ε, p, tol, max_it, tol_it, safe, sym, acc)
+        acc = true,
+        deb = true)
+    SinkhornParameters(Δ, q, η, crit_it, p_η, s, ε, p, tol, max_it, tol_it, safe, sym, acc, deb)
 end
+
+scale(p::SinkhornParameters) = p.s

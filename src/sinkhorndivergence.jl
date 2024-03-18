@@ -11,25 +11,26 @@
     
     Type parameters:
     - `LOG`: whether or not the Sinkhorn algorithm is performed in the log domain.
-    - `SAFE`, `SYM`, `ACC`: as in `SinkhornParameters`.
+    - `SAFE`, `SYM`, `ACC`, `DEB`: as in `SinkhornParameters`.
 """
-struct SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
+struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
     V1::SinkhornVariable{T,d,AT,VT} #X, α, log(α), f, f₋, h, h₋
     V2::SinkhornVariable{T,d,AT,VT}
     CC::CostCollection{T,CT}        #C_xy, C_yx, C_xx, C_yy
-    params::SinkhornParameters{SAFE, SYM, ACC, T}
+    params::SinkhornParameters{SAFE, SYM, ACC, DEB, T}
 
     function SinkhornDivergence(V::SinkhornVariable{T,d,AT,VT}, 
                                 W::SinkhornVariable{T,d,AT,VT}, 
                                 CC::CostCollection{T,CT}, 
-                                params::SinkhornParameters{SAFE, SYM, ACC, T},
-                                log) where {SAFE, SYM, ACC, T, d, AT, VT, CT}
-        new{log, SAFE, SYM, ACC, T, d, AT, VT, CT}(V, W, CC, params)
+                                params::SinkhornParameters{SAFE, SYM, ACC, DEB, T},
+                                log) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
+        new{log, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}(V, W, CC, params)
     end
 end
 
 function SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, log) where {FT<:Base.Callable}
-    CC = CostCollection(V.X, W.X, c)
+    ε = scale(params)
+    CC = CostCollection(V.X, W.X, c, ε)
     SinkhornDivergence(V, W, CC, params, log)
 end
 
@@ -70,12 +71,18 @@ islog(S::SinkhornDivergence{LOG}) where LOG = LOG
 issafe(S::SinkhornDivergence{LOG, SAFE}) where {LOG, SAFE} = SAFE
 issymmetric(S::SinkhornDivergence{LOG, SAFE, SYM}) where {LOG, SAFE, SYM} = SYM
 isaccelerated(S::SinkhornDivergence{LOG, SAFE, SYM, ACC}) where {LOG, SAFE, SYM, ACC} = ACC
+isdebiased(S::SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB}) where {LOG, SAFE, SYM, ACC, DEB} = DEB
 scale(S::SinkhornDivergence) = S.params.s
 max_it(S::SinkhornDivergence) = S.params.max_it
 tol(S::SinkhornDivergence) = S.params.tol
 tol_it(S::SinkhornDivergence) = S.params.tol_it
 minscale(S::SinkhornDivergence) = S.params.ε
 acceleration(S::SinkhornDivergence) = S.params.η
+
+function set_scale!(S::SinkhornDivergence, ε)
+    S.params.s = ε
+    set_scale!(S.CC, ε)
+end
 
 function initialize_potentials!(S::LogSinkhornDivergence)
     initialize_potentials_log!(S.V1, S.V2, S.CC)
@@ -126,14 +133,18 @@ end
 function sinkhorn_step!(S::LogSymmetricSinkhornDivergence)
     @threads for i in eachindex(S.V1.f)
         @inbounds S.V1.f[i] = 1/2 * S.V1.f₋[i] + 1/2 * softmin(i, S.CC.C_yx, S.V2.f₋, S.V2.log_α, scale(S))
-        @inbounds S.V1.h[i] = 1/2 * S.V1.h₋[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h₋, S.V1.log_α, scale(S))
+        if isdebiased(S)
+            @inbounds S.V1.h[i] = 1/2 * S.V1.h₋[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h₋, S.V1.log_α, scale(S))
+        end
         if isaccelerated(S) # the symmetric problem is never accelerated
             @inbounds S.V1.f[i] = (1 - acceleration(S)) * S.V1.f₋[i] + acceleration(S) * S.V1.f[i]
         end
     end
     @threads for j in eachindex(S.V2.f)
         @inbounds S.V2.f[j] = 1/2 * S.V2.f₋[j] + 1/2 * softmin(j, S.CC.C_xy, S.V1.f₋, S.V1.log_α, scale(S))
-        @inbounds S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h₋, S.V2.log_α, scale(S))
+        if isdebiased(S)
+            @inbounds S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h₋, S.V2.log_α, scale(S))
+        end
         if isaccelerated(S)
             @inbounds S.V2.f[j] = (1 - acceleration(S)) * S.V2.f₋[j] + acceleration(S) * S.V2.f[j]
         end
@@ -143,14 +154,18 @@ end
 function sinkhorn_step!(S::LogAsymmetricSinkhornDivergence)
     @threads for i in eachindex(S.V1.f)
         @inbounds S.V1.f[i] = softmin(i, S.CC.C_yx, S.V2.f₋, S.V2.log_α, scale(S))
-        @inbounds S.V1.h[i] = 1/2 * S.V1.h₋[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h₋, S.V1.log_α, scale(S))
+        if isdebiased(S)
+            @inbounds S.V1.h[i] = 1/2 * S.V1.h₋[i] + 1/2 * softmin(i, S.CC.C_xx, S.V1.h₋, S.V1.log_α, scale(S))
+        end
         if isaccelerated(S) # the symmetric problem is never accelerated
             @inbounds S.V1.f[i] = (1 - acceleration(S)) * S.V1.f₋[i] + acceleration(S) * S.V1.f[i]
         end
     end
     @threads for j in eachindex(S.V2.f)
         @inbounds S.V2.f[j] = softmin(j, S.CC.C_xy, S.V1.f, S.V1.log_α, scale(S)) # note that we are using the 'new' S.V1.f here
-        @inbounds S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h₋, S.V2.log_α, scale(S))
+        if isdebiased(S)
+            @inbounds S.V2.h[j] = 1/2 * S.V2.h[j] + 1/2 * softmin(j, S.CC.C_yy, S.V2.h₋, S.V2.log_α, scale(S))
+        end
         if isaccelerated(S)
             @inbounds S.V2.f[j] = (1 - acceleration(S)) * S.V2.f₋[j] + acceleration(S) * S.V2.f[j]
         end
@@ -158,14 +173,21 @@ function sinkhorn_step!(S::LogAsymmetricSinkhornDivergence)
 end
 
 function sinkhorn_step!(S::NologAsymmetricSinkhornDivergence)
-    ε = scale(S)
-    S.V1.f .= S.V1.α ./ ( exp.( -1 .* S.CC.C_yx ./ ε) * S.V2.f₋ )
-    S.V1.h .= sqrt.( S.V1.h₋ .* S.V1.α ./ ( exp.( -1 .* S.CC.C_xx ./ ε) * S.V1.h₋ ) )
+    mul!(S.V1.f, S.CC.K_xy, S.V2.f₋)
+    S.V1.f .= S.V1.α ./ S.V1.f
+    if isdebiased(S)
+        mul!(S.V1.h, S.CC.K_xx, S.V1.h₋)
+        S.V1.h .= sqrt.( S.V1.h₋ .* S.V1.α ./ S.V1.h )
+    end
     if isaccelerated(S) # the symmetric problem is never accelerated
         S.V1.f .= S.V1.f₋.^(1 - acceleration(S)) .* S.V1.f.^acceleration(S)
     end
-    S.V2.f .= S.V2.α ./ ( exp.( -1 .* S.CC.C_xy ./ ε) * S.V1.f )
-    S.V2.h .= sqrt.( S.V2.h₋ .* S.V2.α ./ ( exp.( -1 .* S.CC.C_yy ./ ε) * S.V2.h₋ ) )
+    mul!(S.V2.f, S.CC.K_yx, S.V1.f)
+    S.V2.f .= S.V2.α ./ S.V2.f
+    if isdebiased(S)
+        mul!(S.V2.h, S.CC.K_yy, S.V2.h₋)
+        S.V2.h .= sqrt.( S.V2.h₋ .* S.V2.α ./ ( S.V2.h ) )
+    end
     if isaccelerated(S) # the symmetric problem is never accelerated
         S.V2.f .= S.V2.f₋.^(1 - acceleration(S)) .* S.V2.f.^acceleration(S)
     end
@@ -205,12 +227,16 @@ function compute!(S::SafeSinkhornDivergence)
         end
         S.V1.f₋ .= S.V1.f
         S.V2.f₋ .= S.V2.f
-        S.V1.h₋ .= S.V1.h
-        S.V2.h₋ .= S.V2.h # perhaps these updates can be avoided in some cases
+        if isdebiased(S)
+            S.V1.h₋ .= S.V1.h
+            S.V2.h₋ .= S.V2.h # perhaps these updates can be avoided in some cases
+        end
 
         # lower the scale
         if S.params.q != 1
-            S.params.s = maximum((scale(S) * S.params.q, minscale(S)))
+            s = maximum((scale(S) * S.params.q, minscale(S)))
+            S.params.s = s
+            set_scale!(S.CC, s)
         end
         
         if isaccelerated(S)
@@ -238,11 +264,15 @@ function compute!(S::UnsafeSinkhornDivergence)
         sinkhorn_step!(S)
         S.V1.f₋ .= S.V1.f
         S.V2.f₋ .= S.V2.f
-        S.V1.h₋ .= S.V1.h
-        S.V2.h₋ .= S.V2.h # perhaps these updates can be avoided in some cases
-        
+        if isdebiased(S)
+            S.V1.h₋ .= S.V1.h
+            S.V2.h₋ .= S.V2.h # perhaps these updates can be avoided in some cases
+        end
+
         # lower the scale
-        S.params.s = scale(S) * S.params.q
+        s = scale(S) * S.params.q
+        S.params.s = s
+        set_scale!(S.CC, s)
         
         if isaccelerated(S)
             if it == S.params.crit_it - S.params.p_η
@@ -294,7 +324,8 @@ function marginal_errors(S::LogSinkhornDivergence)
 end
 
 function marginal_error(S::NologSinkhornDivergence)
-    return sum(abs.( S.V1.α .- S.V1.f .* ( exp.( -1 .* S.CC.C_yx ./ scale(S)) * S.V2.f ) ))
+    # TODO: in-place version of this
+    return sum(abs.( S.V1.α .- S.V1.f .* ( S.CC.K_yx * S.V2.f ) ))
 end
 
 @doc raw"""
@@ -336,17 +367,25 @@ end
     - `value(S)`
 """
 function value(S::LogSinkhornDivergence)
-    return (S.V1.f - S.V1.h)' * S.V1.α + (S.V2.f - S.V2.h)' * S.V2.α
+    if isdebiased(S)
+        return (S.V1.f .- S.V1.h)' * S.V1.α + (S.V2.f .- S.V2.h)' * S.V2.α
+    else
+        return S.V1.f' * S.V1.α + S.V2.f' * S.V2.α
+    end
 end
 
 function value(S::NologSinkhornDivergence)
-    return scale(S) * ( (log.(S.V1.f) - log.(S.V1.h))' * S.V1.α + (log.(S.V2.f) .- log.(S.V2.h))' * S.V2.α )
+    if isdebiased(S)
+        return scale(S) * ( (log.(S.V1.f) .- log.(S.V1.h))' * S.V1.α + (log.(S.V2.f) .- log.(S.V2.h))' * S.V2.α )
+    else
+        return scale(S) * ( (log.(S.V1.f) .- S.V1.log_α )' * S.V1.α + (log.(S.V2.f) .- S.V2.log_α )' * S.V2.α )
+    end
 end
 
 """
     x_gradient!
 
-    Compute the gradient of the Sinkhorn divergence with respect to the first probability distribution particle positions and store it in `S.V1.∇fh`.
+    Compute the gradient of the Sinkhorn divergence with respect to the first probability distribution particle positions, divided by their weights, and store it in `S.V1.∇fh`.
 
     Arguments:
     - `S::SinkhornDivergence`
@@ -354,6 +393,7 @@ end
     Returns:
     - `∇S`: A reference to `S.V1.∇fh`.
 """
+# TODO: All of this is still very naive and O(N^2)
 function x_gradient!(S::LogSinkhornDivergence, ∇c)
     X = S.V1.X
     Y = S.V2.X
@@ -369,9 +409,36 @@ function x_gradient!(S::LogSinkhornDivergence, ∇c)
             ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:])
         end
         # W(α,α) term
-        for k in eachindex(S.V1.h)
-            v = exp((S.V1.h[k] + S.V1.h[i] - S.CC.C_xx[i,k])/ε) * S.V1.α[k]
-            ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
+        if isdebiased(S)
+            for k in eachindex(S.V1.h)
+                v = exp((S.V1.h[k] + S.V1.h[i] - S.CC.C_xx[i,k])/ε) * S.V1.α[k]
+                ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
+            end
+        end
+    end
+    ∇S
+end
+
+function x_gradient!(S::NologSinkhornDivergence, ∇c)
+    X = S.V1.X
+    Y = S.V2.X
+    g = S.V2.f
+    f = S.V1.f
+    ε = scale(S)
+    ∇S = S.V1.∇fh
+    ∇S .= 0
+    for i in eachindex(f)
+        # W(α,β) term
+        for j in eachindex(g)
+            v = g[j] * f[i] * S.CC.K_xy[i,j] / S.V1.α[i]
+            ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:])
+        end
+        # W(α,α) term
+        if isdebiased(S)
+            for k in eachindex(S.V1.h)
+                v = S.V1.h[k] * S.V1.h[i] * S.CC.K_xx[i,k] / S.V1.α[i]
+                ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
+            end
         end
     end
     ∇S
@@ -380,7 +447,7 @@ end
 """
     y_gradient!
 
-    Compute the gradient of the Sinkhorn divergence with respect to the second probability distribution particle positions and store it in `S.V2.∇fh`.
+    Compute the gradient of the Sinkhorn divergence with respect to the second probability distribution particle positions, divided by their weights, and store it in `S.V2.∇fh`.
 
     Arguments:
     - `S::SinkhornDivergence`
@@ -403,9 +470,36 @@ function y_gradient!(S::LogSinkhornDivergence, ∇c)
             ∇S[j,:] .+= v .* ∇c(Y[j,:],X[i,:])
         end
         # W(β,β) term
-        for k in eachindex(S.V2.h)
-            v = exp((S.V2.h[k] + S.V2.h[j] - S.CC.C_yy[j,k])/ε) * S.V2.α[k]
-            ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:])
+        if isdebiased(S)
+            for k in eachindex(S.V2.h)
+                v = exp((S.V2.h[k] + S.V2.h[j] - S.CC.C_yy[j,k])/ε) * S.V2.α[k]
+                ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:])
+            end
+        end
+    end
+    ∇S
+end
+
+function y_gradient!(S::NologSinkhornDivergence, ∇c)
+    X = S.V1.X
+    Y = S.V2.X
+    g = S.V2.f
+    f = S.V1.f
+    ε = scale(S)
+    ∇S = S.V2.∇fh
+    ∇S .= 0
+    for j in eachindex(g)
+        # W(α,β) term
+        for i in eachindex(f) 
+            v = g[j] * f[i] * S.CC.K_yx[j,i] / S.V2.α[j]
+            ∇S[j,:] .+= v .* ∇c(Y[i,:],X[j,:])
+        end
+        # W(α,α) term
+        if isdebiased(S)
+            for k in eachindex(S.V2.h)
+                v = S.V2.h[k] * S.V2.h[j] * S.CC.K_yy[j,k] / S.V2.α[j]
+                ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:])
+            end
         end
     end
     ∇S
