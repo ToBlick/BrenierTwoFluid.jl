@@ -99,6 +99,9 @@ function run_euler()
     Δt = DELTA_T
     nt = Int(ceil((T-t)/Δt))
 
+    ε  = ENTROPIC_REG
+    λ² = LAMBDA_SQUARE
+
     solX = [ zero(X) for i in 1:(nt + 1) ]
     solV = [ zero(V) for i in 1:(nt + 1) ]
     solD = [ 0.0 for i in 1:(nt + 1) ]
@@ -137,78 +140,21 @@ function run_euler()
         sol_alpha[1+it] = copy(α)
     end
 
-    fid = h5open(path, "w")
-    fid["X"] = [ solX[i][j,k] for i in eachindex(solX), j in axes(X,1), k in axes(X,2) ];
-    fid["V"] = [ solV[i][j,k] for i in eachindex(solV), j in axes(V,1), k in axes(V,2) ];
+    fid = h5open(PATH_OUT, "w")
+    fid["X"] = [ solX[i][j,k] for i in eachindex(solX), j in axes(X,1), k in axes(X,2) ]
+    fid["V"] = [ solV[i][j,k] for i in eachindex(solV), j in axes(V,1), k in axes(V,2) ]
     fid["D"] = solD
-    fid["alpha"] = [ sol_alpha[i][j] for i in eachindex(sol_alpha), j in axes(α,1) ];
-    fid["species"] = [ sol_species[i][j] for i in eachindex(sol_species), j in axes(species,1) ]
+    fid["alpha"] = α
     fid["beta"] = α
-    fid["grad"] = [ sol∇S[i][j,k] for i in eachindex(sol∇S), j in axes(X,1), k in axes(X,2) ];
+    fid["grad"] = [ sol∇S[i][j,k] for i in eachindex(sol∇S), j in axes(X,1), k in axes(X,2) ]
     fid["lambda"] = sqrt(λ²)
     fid["epsilon"] = ε
-    fid["tol"] = tol
-    fid["crit_it"] = crit_it
-    fid["p"] = p_η
+    fid["tol"] = SINKHORN_TOLERANCE
+    fid["crit_it"] = ACCELERATION_IT
+    fid["p"] = ACCELERATION_P
     fid["deltat"] = Δt
-    close(fid)
 
     return S
 end
 
-
 S = run_euler()
-
-#=
-Π = Matrix(TransportPlan(S));
-
-suppΠ = zero(Π);
-for i in axes(Π,1), j in axes(Π,2)
-    suppΠ[i,j] = (S.V1.f[i] + S.V2.f[j] - S.CC.C_xy[i,j] > -5ε ? 1 : 0)
-end
-sum(suppΠ)/(N^2)
-
-svdΠ = svd(Π);
-plot(svdΠ.S ./ svdΠ.S[1], yaxis = :log)
-=#
-
-#=
-params_coarse = SinkhornParameters(ε=ε,q=q,Δ=Δ,s=ε,tol=tol,crit_it=crit_it,p_η=p_η,max_it=max_it,sym=sym,acc=acc);
-S = SinkhornDivergence(S.V1,S.V2,S.CC,params_coarse,true);
-scale(S)
-initialize_potentials!(S);
-compute!(S);
-
-Π = Matrix(TransportPlan(S));
-suppΠ = zero(Π);
-for i in axes(Π,1), j in axes(Π,2)
-    suppΠ[i,j] = (S.V1.f[i] + S.V2.f[j] - S.CC.C_xy[i,j] > -3ε ? 1 : 0)
-end
-
-sum(suppΠ)/(N^2)
-
-Παα = (S.V1.α*S.V1.α') .* exp.( (-S.CC.C_xx + S.V1.h * ones(N)' + ones(N)*S.V1.h') / ε );
-Πββ = (S.V2.α*S.V2.α') .* exp.( (-S.CC.C_yy + S.V2.h * ones(N)' + ones(N)*S.V2.h') / ε );
-
-(dot(S.CC.C_xy, Π) + ε * dot(log.(Π) .- log.(S.V1.α*S.V2.α'), Π) 
-- 0.5 * (dot(S.CC.C_xx, Παα) + ε * dot(log.(Παα) .- log.(S.V1.α*S.V1.α'), Παα))
-- 0.5 * (dot(S.CC.C_yy, Πββ) + ε * dot(log.(Πββ) .- log.(S.V2.α*S.V2.α'), Πββ)) )
-
-# dot(S.CC.C_xy, S.V1.α*S.V2.α') - 0.5*dot(S.CC.C_xx, S.V1.α*S.V1.α') - 0.5*dot(S.CC.C_yy, S.V2.α*S.V2.α')
-
-dot(S.V1.f - S.V1.h, S.V1.α) + dot(S.V2.f - S.V2.h, S.V2.α)
-
-Π*ones(N)*N
-Π'*ones(N)*N
-
-svdΠ = svd(Π);
-
-plot(svdΠ.S[1:1000], yaxis = :log)
-
-scatter(S.V1.X[:,1], S.V1.X[:,2], S.V1.f, markersize=1)
-scatter(S.V2.X[:,1], S.V2.X[:,2], λ²/2 .* S.V2.f, markersize=1)
-
-p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
-
-scatter(S.V2.X[:,1], S.V2.X[:,2], [p0(S.V2.X[i,:]) for i in 1:N], markersize=1)
-=#
