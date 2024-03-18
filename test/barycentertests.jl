@@ -1,5 +1,9 @@
 # compute W_2 barycenter between two distributions shifted by +/- an offset - barycenter should be the original distribution
-
+using BrenierTwoFluid
+using Test
+using Distances
+using Random
+using LinearAlgebra
 using Plots
 
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
@@ -31,7 +35,7 @@ B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3, true);
 
 @time compute!(B)
 
-Vμ = SinkhornVariable(Z, μ)
-Vμ_true = SinkhornVariable(Z_true, μ)
-S = SinkhornDivergence(Vμ_true,Vμ,c,params,true)
+Vμ = SinkhornVariable(Z, μ);
+Vμ_true = SinkhornVariable(Z_true, μ);
+S = SinkhornDivergence(Vμ_true, Vμ, c, params, true);
 @test compute!(S) < 1e-3

@@ -6,7 +6,6 @@
     Fields:
     - `ω::Vector{T}`: weights of the input distributions.
     - `Ss::Vector{SinkhornDivergence}`: Sinkhorn divergences between the input distributions and the barycenter.
-    - `CCs::Vector{CostCollection}`: cost collections for the Sinkhorn divergences.
     - `∇c`: gradient of the cost function.
     - `max_it::Int`: maximum number of iterations. This can be different from the maximum number of iterations of the Sinkhorn divergences, typically it is much smaller.
     - `tol::T`: tolerance for the stopping criterion. This can be different from the tolerance of the Sinkhorn divergences.
@@ -15,32 +14,41 @@
     Type parameters:
     - `LOG, SAFE, SYM, ACC`: As in `SinkhornDivergence` and in fact identical to those values of the contained `SinkhornDivergence` objects.
 """
-struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
+struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
     ω::Vector{T}
-    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}}
-    CCs::Vector{CostCollection{T,CT}}
+    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}}
     ∇c
     max_it::Int
     tol::T
     δX::AT
+
+    function SinkhornBarycenter(ω::Vector{T},
+                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}},
+                                ∇c,
+                                max_it::Int,
+                                tol::T,
+                                δX::AT) where {LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
+        new{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}(ω, Ss, ∇c, max_it, tol, δX)
+    end
 end
 
 function SinkhornBarycenter(ω,
                             Xμ::AT,
                             μ::VT,
-                            Vs::Vector{SinkhornVariable{T,d,AT,VT}},
-                            c,
+                            Vs::Vector{SinkhornVariable{T, d, AT, VT}},
+                            c::Base.Callable,
                             ∇c,
-                            params::SinkhornParameters{SAFE, SYM, ACC, T},
+                            params::SinkhornParameters{SAFE, SYM, ACC, DEB, T},
                             max_it::Int,
                             tol,
-                            islog) where {SAFE, SYM, ACC, T, d, AT, VT}
+                            islog::Bool) where {SAFE, SYM, ACC, DEB, T, d, AT, VT}
 
     log_μ = log.(μ)
+    μ_variable = SinkhornVariable(Xμ, μ, log_μ)
 
-    CCs = [ CostCollection(Xμ, Vs[i].X, c) for i in eachindex(Vs) ]
-    Ss = [ SinkhornDivergence(SinkhornVariable(Xμ, μ, log_μ), Vs[i], CCs[i], params, islog) for i in eachindex(Vs) ]
-    SinkhornBarycenter(ω, Ss, CCs, ∇c, max_it, tol, zero(Xμ))
+    Ss = [ SinkhornDivergence(μ_variable, Vs[i], c, params, islog) for i in eachindex(Vs) ]
+    SinkhornBarycenter(ω, Ss, ∇c, max_it, tol, zero(Xμ))
+
 end
 
 const SafeSinkhornBarycenter = SinkhornBarycenter{T, true} where {T}

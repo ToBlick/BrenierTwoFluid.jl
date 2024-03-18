@@ -38,12 +38,13 @@ for i = 1:2
                 Y .= (rand(M,d) .- 0.5) .+ offset
         end
 
-        CC = CostCollection(X, Y, c)
+        CC = CostCollection(X, Y, c, ε)
         V = SinkhornVariable(X,α)
         W = SinkhornVariable(Y,β)
 
         # acc, no sym
-        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=false,acc=true)
+        params = SinkhornParameters(ε=ε,q=1.0,Δ=1.0,s=s,tol=tol,crit_it=crit_it,p_η=p_η,sym=false,acc=true,deb=true)
+        # log domain
         S = SinkhornDivergence(V,W,c,params,true)
         initialize_potentials!(S)
         @time valueS = compute!(S)

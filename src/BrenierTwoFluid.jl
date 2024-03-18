@@ -5,9 +5,10 @@ using Base.Threads
 using Plots
 using LaTeXStrings
 using LinearAlgebra
+using KrylovKit
 
 include("costs.jl")
-export LazyCost, CostCollection, c_periodic, ∇c_periodic
+export LazyCost, CostCollection, c_periodic, ∇c_periodic, scale, set_scale!
 
 include("sinkhornvariable.jl")
 export SinkhornVariable, initialize_potentials_nolog!, initialize_potentials_log!
@@ -17,7 +18,7 @@ export SinkhornParameters
 
 include("sinkhorndivergence.jl")
 export SinkhornDivergence, softmin, sinkhorn_step!, value, compute!, x_gradient!, x_gradient, y_gradient, y_gradient!
-export scale, maxit, tol, acceleration, marginal_error
+export maxit, tol, acceleration, marginal_error, scale, set_scale!
 export initialize_potentials!
 
 include("barycenter.jl")
@@ -28,5 +29,11 @@ export TransportPlan, transportmatrix
 
 include("plotting.jl")
 export plot
+
+include("rbf.jl")
+export bspline, kde
+
+include("resampling.jl")
+export resample!
 
 end
