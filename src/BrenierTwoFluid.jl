@@ -8,7 +8,7 @@ using LinearAlgebra
 using KrylovKit
 
 include("costs.jl")
-export LazyCost, CostCollection, c_periodic, ∇c_periodic, scale, set_scale!
+export LazyCost, CostCollection, c_periodic, ∇c_periodic, scale, set_scale!, c_periodic_x, ∇c_periodic_x
 
 include("sinkhornvariable.jl")
 export SinkhornVariable, initialize_potentials_nolog!, initialize_potentials_log!

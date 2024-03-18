@@ -134,6 +134,36 @@ function ∇c_periodic(x,y,D)
     ∇c
 end
 
+function c_periodic_x(x::VT,y::VT,D) where {T,VT <: AbstractVector{T}}
+    d = 0
+    for i in [1]
+        if x[i] - y[i] > D[i]/2
+            d += (x[i] - y[i] - D[i])^2
+        elseif x[i] - y[i] < -D[i]/2
+            d += (x[i] - y[i] + D[i])^2
+        else
+            d += (x[i] - y[i])^2
+        end
+    end
+    d += (x[2] - y[2])^2
+    0.5 * d
+end
+
+function ∇c_periodic_x(x,y,D)
+    ∇c = zero(x)
+    for i in [1]
+        if x[i] - y[i] > D[i]/2
+            ∇c[i] = x[i] - y[i] - D[i]
+        elseif x[i] - y[i] < -D[i]/2
+            ∇c[i] = (x[i] - y[i] + D[i])
+        else
+            ∇c[i] = x[i] - y[i]
+        end
+    end
+    ∇c[2] = x[2] - y[2]
+    ∇c
+end
+
         #reflecting boundary
         #=
         for i in axes(X,1)
