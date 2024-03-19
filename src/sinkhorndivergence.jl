@@ -105,8 +105,8 @@ end
 
 """
 function softmin(j, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::T) where T
-    M = -Inf
-    r = 0.0
+    M::T = -Inf
+    r::T = 0
     # this is serial for now 
     @inbounds for i in eachindex(f)
         v = (f[i] - C[i,j])/ε + log_α[i]
