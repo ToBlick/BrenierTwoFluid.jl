@@ -23,9 +23,9 @@ struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
                                 W::SinkhornVariable{T,d,AT,VT}, 
                                 CC::CostCollection{T,CT}, 
                                 params::SinkhornParameters{SAFE, SYM, ACC, DEB, T};
-                                log = true,
-                                lowrank = false) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
-        new{log, SAFE, SYM, ACC, DEB, lowrank, T, d, AT, VT, CT}(V, W, CC, params)
+                                islog = true,
+                                islowrank = false) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
+        new{islog, SAFE, SYM, ACC, DEB, islowrank, T, d, AT, VT, CT}(V, W, CC, params)
     end
 end
 
@@ -33,11 +33,11 @@ function SinkhornDivergence(V::SinkhornVariable,
                             W::SinkhornVariable, 
                             c::FT, 
                             params::SinkhornParameters; 
-                            log = true, 
-                            lowrank = false) where {FT<:Base.Callable}
+                            islog = true, 
+                            islowrank = false) where {FT<:Base.Callable}
     ε = scale(params)
     CC = CostCollection(V.X, W.X, c, ε)
-    SinkhornDivergence(V, W, CC, params; log=log, lowrank=lowrank)
+    SinkhornDivergence(V, W, CC, params; islog=islog, islowrank=islowrank)
 end
 
 #

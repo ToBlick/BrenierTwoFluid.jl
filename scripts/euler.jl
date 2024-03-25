@@ -103,7 +103,7 @@ function run_euler(path)
                            SinkhornVariable(Y, β),
                            c,
                            params;
-                           log = LOG)
+                           islog = LOG)
     initialize_potentials!(S)
     compute!(S)
           

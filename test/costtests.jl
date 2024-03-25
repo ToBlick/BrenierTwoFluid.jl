@@ -22,8 +22,8 @@ params = SinkhornParameters(ε = ε);
 S = SinkhornDivergence(SinkhornVariable(X, α),
                         SinkhornVariable(Y, β),
                         c,
-                        params,
-                        true);
+                        params;
+                        islog = true);
 
 C_naive = 0.5 * [ norm(X[i,:] - Y[j,:])^2 for i in 1:N, j in 1:M ];
 norm_C = norm(C_naive)

@@ -23,6 +23,9 @@ Z_true = rand(N,d)
 
 Vα = SinkhornVariable(X,α)
 Vβ = SinkhornVariable(Y,β)
+Vμ = SinkhornVariable(Z,μ)
+
+V_vec = [Vα, Vβ];
 
 ε = 0.1
 tol = 1e-5
@@ -30,12 +33,11 @@ tol = 1e-5
 params = SinkhornParameters(ε=ε,tol=tol,sym=false,acc=true);
 
 ω = [0.5, 0.5];
-
-B = SinkhornBarycenter(ω, Z, μ, [Vα, Vβ], c, ∇c, params, 10, 1e-3, true);
+B = SinkhornBarycenter(ω, [ SinkhornDivergence(Vμ, V_vec[i], c, params, islog=true) for i in eachindex(V_vec) ], ∇c, 10, 1e-3, zero(Z));
 
 @time compute!(B)
 
 Vμ = SinkhornVariable(Z, μ);
 Vμ_true = SinkhornVariable(Z_true, μ);
-S = SinkhornDivergence(Vμ_true, Vμ, c, params, true);
+S = SinkhornDivergence(Vμ_true, Vμ, c, params, islog=true);
 @test compute!(S) < 1e-3

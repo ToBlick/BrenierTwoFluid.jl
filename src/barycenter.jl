@@ -14,21 +14,21 @@
     Type parameters:
     - `LOG, SAFE, SYM, ACC`: As in `SinkhornDivergence` and in fact identical to those values of the contained `SinkhornDivergence` objects.
 """
-struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
+struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
     ω::Vector{T}
-    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}}
+    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}}
     ∇c
     max_it::Int
     tol::T
     δX::AT
 
     function SinkhornBarycenter(ω::Vector{T},
-                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}},
+                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}},
                                 ∇c,
                                 max_it::Int,
                                 tol::T,
-                                δX::AT) where {LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
-        new{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}(ω, Ss, ∇c, max_it, tol, δX)
+                                δX::AT) where {LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
+        new{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}(ω, Ss, ∇c, max_it, tol, δX)
     end
 end
 
@@ -40,15 +40,12 @@ function SinkhornBarycenter(ω,
                             ∇c,
                             params::SinkhornParameters{SAFE, SYM, ACC, DEB, T},
                             max_it::Int,
-                            tol,
-                            islog::Bool) where {SAFE, SYM, ACC, DEB, T, d, AT, VT}
-
+                            tol;
+                            islog = true) where {SAFE, SYM, ACC, DEB, LR, T, d, AT, VT}
     log_μ = log.(μ)
     μ_variable = SinkhornVariable(Xμ, μ, log_μ)
-
-    Ss = [ SinkhornDivergence(μ_variable, Vs[i], c, params, islog) for i in eachindex(Vs) ]
+    Ss = [ SinkhornDivergence(μ_variable, Vs[i], c, params, islog=islog) for i in eachindex(Vs) ]
     SinkhornBarycenter(ω, Ss, ∇c, max_it, tol, zero(Xμ))
-
 end
 
 const SafeSinkhornBarycenter = SinkhornBarycenter{T, true} where {T}

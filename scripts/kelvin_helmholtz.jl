@@ -102,7 +102,7 @@ function run_kelvin_helmholtz()
                            SinkhornVariable(Y, β),
                            c,
                            params,
-                           LOG)
+                           islog = LOG)
     initialize_potentials!(S)
     compute!(S)
           

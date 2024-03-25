@@ -52,7 +52,7 @@ for i in 1:2
                 else
                         params = SinkhornParameters(ε=ε,q=0.9,Δ=1.0,s=Δ,tol=tol,crit_it=crit_it,p_η=p_η,sym=sym,acc=acc,deb=deb,safe=safe)
                 end
-                S = SinkhornDivergence(V,W,c,params,islog)
+                S = SinkhornDivergence(V,W,c,params,islog=islog)
                 initialize_potentials!(S)
                 @time valueS = compute!(S)
 
