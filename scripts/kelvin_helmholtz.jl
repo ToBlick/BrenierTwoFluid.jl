@@ -22,9 +22,9 @@ const ∇c = (x,y) -> ∇c_periodic_x(x,y,DOMAIN)
 const N = 50^2
 const M = 50^2
 
-const T = 1.0             # final time
+const T = 0.2             # final time
 
-const ENTROPIC_REG = 0.01 * N^(-1/3)    # entropic regularization parameter ε
+const ENTROPIC_REG = N^(-1/3)    # entropic regularization parameter ε
 
 const SCALING_RATE = 1.0    # ε-scaling rate
 const R = 0.5 * sum([l^2 for l in DOMAIN])   # L infinity norm of the cost function
@@ -46,14 +46,14 @@ const SAFE = true           # safe stopping criterion versus fixed heuristic num
 
 const SEED = 123            # for reproducibility
 
-const DELTA_T = 1/100                    # time step
+const DELTA_T = 1/200                    # time step
 const LAMBDA_SQUARE = 2 / (DELTA_T^2)   # relaxation parameter
 
 const X_ON_GRID = true
 const Y_ON_GRID = true
 
 # initial velocity
-const u0(x) = x[2] < 0.05 * cos(x[1]*2π*4) ? [1.0,0] : [0.5,0]
+const u0(x) = x[2] < 0.05 * cos(x[1]*2π*2) ? [1.0,0] : [0.5,0]
 
 function run_kelvin_helmholtz()
 

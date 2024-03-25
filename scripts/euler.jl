@@ -8,20 +8,15 @@ using ProgressBars
 using HDF5
 using Dates
 
-
-### Set output file
-const PATH_OUT = "runs/$(now()).hdf5"
-###
-
 ### parameters
 const d = 2
-const c = (x,y) -> 0.5 * sqeuclidean(x,y)
-const ∇c = (x,y) -> x-y
-
-const N = 30^2
-const M = 30^2
-
 const DOMAIN = (1.0, 1.0)   # only cubes for now
+
+const c = (x,y) -> 0.5 * sqeuclidean(x,y) # c_periodic(x,y,DOMAIN)
+const ∇c = (x,y) -> x-y # ∇c_periodic(x,y,DOMAIN)
+
+const N = 40^2
+const M = 40^2
 
 const T = 1.0               # final time
 
@@ -47,23 +42,40 @@ const SAFE = true           # safe stopping criterion versus fixed heuristic num
 
 const SEED = 123            # for reproducibility
 
-const DELTA_T = 1/50                    # time step
+const DELTA_T = 1/200                    # time step
 const LAMBDA_SQUARE = 2 / (DELTA_T^2)   # relaxation parameter
 
 const X_ON_GRID = true
 const Y_ON_GRID = true
 
-const u0(x) = [-cos(π*x[1])*sin(π*x[2]), sin(π*x[1])*cos(π*x[2])]
+const u0(x) = [-cos(1*π*x[1])*sin(1*π*x[2]), 
+                sin(1*π*x[1])*cos(1*π*x[2])]
 const p0(x) = 0.5 * (sin(π*x[1])^2 + sin(π*x[2])^2)
 const ∇p(x) = π * [sin(π*x[1])*cos(π*x[1]), sin(π*x[2])*cos(π*x[2])]
 
-function run_euler()
+function run_euler(path)
     Random.seed!(SEED)
+
+    function enforce_periodicity!(X, D)
+        for i in axes(X,1)
+            for j in axes(X,2)
+                if X[i,j] > D[j]/2
+                    X[i,j] -= D[j]
+                elseif X[i,j] < -D[j]/2
+                    X[i,j] += D[j]
+                end
+            end
+        end
+    end
 
     α = ones(N) / N
     β = ones(M) / M
-    Y = stack(vec([ [x,y] for x in range(-0.5,0.5,length=Int(sqrt(M))), y in range(-0.5,0.5,length=Int(sqrt(M))) ]), dims = 1)
-    X = stack(vec([ [x,y] for x in range(-0.5,0.5,length=Int(sqrt(N))), y in range(-0.5,0.5,length=Int(sqrt(N))) ]), dims = 1)
+    hN = 1/sqrt(N)
+    hM = 1/sqrt(M)
+    X = stack(vec([ [x,y] for x in range(-DOMAIN[1]/2+hN/2,DOMAIN[1]/2-hN/2,length=Int(sqrt(N))), 
+                              y in range(-DOMAIN[2]/2+hN/2,DOMAIN[2]/2-hN/2,length=Int(sqrt(N))) ]), dims = 1)
+    Y = stack(vec([ [x,y] for x in range(-DOMAIN[1]/2+hM/2,DOMAIN[1]/2-hM/2,length=Int(sqrt(M))), 
+                              y in range(-DOMAIN[2]/2+hM/2,DOMAIN[2]/2-hM/2,length=Int(sqrt(M))) ]), dims = 1)
     X_ON_GRID ? nothing : X = rand(N,d) .- 0.5
     Y_ON_GRID ? nothing : Y = rand(M,d) .- 0.5
 
@@ -90,8 +102,8 @@ function run_euler()
     S = SinkhornDivergence(SinkhornVariable(X, α),
                            SinkhornVariable(Y, β),
                            c,
-                           params,
-                           LOG)
+                           params;
+                           log = LOG)
     initialize_potentials!(S)
     compute!(S)
           
@@ -111,10 +123,12 @@ function run_euler()
     solV[1] = copy(V)
     solD[1] = value(S)
     sol∇S[1] = copy(x_gradient!(S, ∇c))
+
     # integrate
     for it in ProgressBar(1:nt)
 
         X .+= 0.5 * Δt * V
+        #enforce_periodicity!(X, DOMAIN)
 
         SCALING_RATE == 1.0 ? nothing : set_scale!(S, INITIAL_SCALE)
 
@@ -123,8 +137,20 @@ function run_euler()
         ∇S = x_gradient!(S, ∇c)
 
         V .-= Δt .* λ² .* ∇S
-        
+
+        #=
+        iit = 0
+        while λ² * value(S) > 1e-3
+            X .-= ∇S
+            initialize_potentials!(S)
+            compute!(S)
+            ∇S = x_gradient!(S, ∇c)
+            iit += 1
+        end
+        =#
+
         X .+= 0.5 .* Δt .* V
+        #enforce_periodicity!(X, DOMAIN)
 
         if PRECISE_DIAGNOSTICS
             initialize_potentials!(S)
@@ -136,11 +162,9 @@ function run_euler()
         solV[1+it] = copy(V)
         solD[1+it] = value(S)
         sol∇S[1+it] = copy(x_gradient!(S, ∇c))
-        sol_species[1+it] = copy(species)
-        sol_alpha[1+it] = copy(α)
     end
 
-    fid = h5open(PATH_OUT, "w")
+    fid = h5open(path, "w")
     fid["X"] = [ solX[i][j,k] for i in eachindex(solX), j in axes(X,1), k in axes(X,2) ]
     fid["V"] = [ solV[i][j,k] for i in eachindex(solV), j in axes(V,1), k in axes(V,2) ]
     fid["D"] = solD
@@ -157,4 +181,4 @@ function run_euler()
     return S
 end
 
-S = run_euler()
+S = run_euler("runs/$(now()).hdf5");
