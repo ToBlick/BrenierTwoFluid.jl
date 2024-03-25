@@ -68,20 +68,20 @@ struct CostCollection{T, CT <: AbstractMatrix{T}, KT <: AbstractMatrix{T}}
     K_yx::KT
     K_xx::KT
     K_yy::KT    # typically lazy Gibbs kernels
+end
 
-    function CostCollection(X::AT, Y::AT, c::FT, ε) where {T, AT <: AbstractArray{T}, FT <: Base.Callable}
-        C_xy = LazyCost(X,Y,c)
-        C_yx = LazyCost(Y,X,c)
-        C_xx = LazyCost(X,X,c)
-        C_yy = LazyCost(Y,Y,c)
+function CostCollection(X::AT, Y::AT, c::FT, ε) where {T, AT <: AbstractArray{T}, FT <: Base.Callable}
+    C_xy = LazyCost(X,Y,c)
+    C_yx = LazyCost(Y,X,c)
+    C_xx = LazyCost(X,X,c)
+    C_yy = LazyCost(Y,Y,c)
 
-        K_xy = LazyGibbsKernel(C_xy, ε)
-        K_yx = LazyGibbsKernel(C_yx, ε)
-        K_xx = LazyGibbsKernel(C_xx, ε)
-        K_yy = LazyGibbsKernel(C_yy, ε)
+    K_xy = LazyGibbsKernel(C_xy, ε)
+    K_yx = LazyGibbsKernel(C_yx, ε)
+    K_xx = LazyGibbsKernel(C_xx, ε)
+    K_yy = LazyGibbsKernel(C_yy, ε)
 
-        new{T, typeof(C_xy), typeof(K_xy)}( C_xy, C_yx, C_xx, C_yy, K_xy, K_yx, K_xx, K_yy )
-    end
+    CostCollection( C_xy, C_yx, C_xx, C_yy, K_xy, K_yx, K_xx, K_yy )
 end
 
 scale(C::CostCollection) = scale(C.K_xy)

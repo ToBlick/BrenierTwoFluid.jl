@@ -13,7 +13,7 @@
     - `LOG`: whether or not the Sinkhorn algorithm is performed in the log domain.
     - `SAFE`, `SYM`, `ACC`, `DEB`: as in `SinkhornParameters`.
 """
-struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
+struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
     V1::SinkhornVariable{T,d,AT,VT} #X, α, log(α), f, f₋, h, h₋
     V2::SinkhornVariable{T,d,AT,VT}
     CC::CostCollection{T,CT}        #C_xy, C_yx, C_xx, C_yy
@@ -22,16 +22,22 @@ struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
     function SinkhornDivergence(V::SinkhornVariable{T,d,AT,VT}, 
                                 W::SinkhornVariable{T,d,AT,VT}, 
                                 CC::CostCollection{T,CT}, 
-                                params::SinkhornParameters{SAFE, SYM, ACC, DEB, T},
-                                log) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
-        new{log, SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}(V, W, CC, params)
+                                params::SinkhornParameters{SAFE, SYM, ACC, DEB, T};
+                                log = true,
+                                lowrank = false) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
+        new{log, SAFE, SYM, ACC, DEB, lowrank, T, d, AT, VT, CT}(V, W, CC, params)
     end
 end
 
-function SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, log) where {FT<:Base.Callable}
+function SinkhornDivergence(V::SinkhornVariable, 
+                            W::SinkhornVariable, 
+                            c::FT, 
+                            params::SinkhornParameters; 
+                            log = true, 
+                            lowrank = false) where {FT<:Base.Callable}
     ε = scale(params)
     CC = CostCollection(V.X, W.X, c, ε)
-    SinkhornDivergence(V, W, CC, params, log)
+    SinkhornDivergence(V, W, CC, params; log=log, lowrank=lowrank)
 end
 
 #
@@ -54,15 +60,6 @@ const NologSymmetricSinkhornDivergence = SinkhornDivergence{false, SAFE, true} w
 const LogAsymmetricSinkhornDivergence = SinkhornDivergence{true, SAFE, false} where {SAFE}
 const NologAsymmetricSinkhornDivergence = SinkhornDivergence{false, SAFE, false} where {SAFE}
 
-
-function getLogSinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters) where {FT<:Base.Callable}
-    SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, true)
-end
-
-function getNologSinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters) where {FT<:Base.Callable}
-    SinkhornDivergence(V::SinkhornVariable, W::SinkhornVariable, c::FT, params::SinkhornParameters, false)
-end
-
 #
 # Convenience
 #
@@ -72,6 +69,8 @@ issafe(S::SinkhornDivergence{LOG, SAFE}) where {LOG, SAFE} = SAFE
 issymmetric(S::SinkhornDivergence{LOG, SAFE, SYM}) where {LOG, SAFE, SYM} = SYM
 isaccelerated(S::SinkhornDivergence{LOG, SAFE, SYM, ACC}) where {LOG, SAFE, SYM, ACC} = ACC
 isdebiased(S::SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB}) where {LOG, SAFE, SYM, ACC, DEB} = DEB
+islowrank(S::SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR}) where {LOG, SAFE, SYM, ACC, DEB, LR} = LR
+
 scale(S::SinkhornDivergence) = S.params.s
 max_it(S::SinkhornDivergence) = S.params.max_it
 tol(S::SinkhornDivergence) = S.params.tol
@@ -206,6 +205,11 @@ end
 """
 function compute!(S::SafeSinkhornDivergence)
     r_p = 0
+    if islowrank(S)
+        τ = S.params.tol/8
+        S.V1.α .= (1-τ)*S.V1.α .+ τ/length(S.V1.α)
+        S.V2.α .= (1-τ)*S.V2.α .+ τ/length(S.V2.α)
+    end
     for it in 1:max_it(S)
         # do one sinkhorn step
         sinkhorn_step!(S)
@@ -253,12 +257,23 @@ function compute!(S::SafeSinkhornDivergence)
         end
         it += 1
     end
-    return value(S)
+    valS = value(S)
+    if islowrank(S)
+        τ = S.params.tol/8
+        S.V1.α .= (S.V1.α - τ/length(S.V1.α)) ./ (1-τ)
+        S.V2.α .= (S.V2.α - τ/length(S.V2.α)) ./ (1-τ)
+    end
+    return valS
 end
 
 function compute!(S::UnsafeSinkhornDivergence)
     it = 1
     r_p = 0
+    if islowrank(S)
+        τ = S.params.tol/8
+        S.V1.α .= (1-τ)*S.V1.α .+ τ/length(S.V1.α)
+        S.V2.α .= (1-τ)*S.V2.α .+ τ/length(S.V2.α)
+    end
     while (scale(S) >= minscale(S)) && (it <= max_it(S))
         # do one sinkhorn iteration
         sinkhorn_step!(S)
@@ -288,7 +303,13 @@ function compute!(S::UnsafeSinkhornDivergence)
         end
         it += 1
     end
-    return value(S)
+    valS = value(S)
+    if islowrank(S)
+        τ = S.params.tol/8
+        S.V1.α .= (S.V1.α - τ/length(S.V1.α)) ./ (1-τ)
+        S.V2.α .= (S.V2.α - τ/length(S.V2.α)) ./ (1-τ)
+    end
+    return valS
 end
 
 @doc raw"""
@@ -393,7 +414,7 @@ end
     Returns:
     - `∇S`: A reference to `S.V1.∇fh`.
 """
-# TODO: All of this is still very naive and O(N^2)
+# TODO: All of this is still very naive and O(N^2) - not even threadded
 function x_gradient!(S::LogSinkhornDivergence, ∇c)
     X = S.V1.X
     Y = S.V2.X
