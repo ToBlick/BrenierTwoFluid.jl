@@ -5,6 +5,9 @@ using Distances
 using Random
 using LinearAlgebra
 
+const dotime = false
+# const dotime = true
+
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x - y
 d = 3
@@ -52,15 +55,17 @@ for i in 1:2
                 else
                         params = SinkhornParameters(ε=ε,q=0.9,Δ=1.0,s=Δ,tol=tol,crit_it=crit_it,p_η=p_η,sym=sym,acc=acc,deb=deb,safe=safe)
                 end
+
                 S = SinkhornDivergence(V,W,c,params,islog=islog)
                 initialize_potentials!(S)
-                @time valueS = compute!(S)
+                dotime ? valueS = @time(compute!(S)) : valueS = compute!(S)
 
                 if deb
                         @test abs(valueS - truevalue) < (sqrt(N*M))^(-2/(d′+4))
                 else
                         @test abs(valueS - truevalue) < (sqrt(N*M))^(-1/(d′+4))
                 end
+
                 ∇S_x = x_gradient!(S, ∇c)
                 ∇S_y = y_gradient!(S, ∇c)
 

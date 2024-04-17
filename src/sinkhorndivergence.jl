@@ -13,19 +13,19 @@
     - `LOG`: whether or not the Sinkhorn algorithm is performed in the log domain.
     - `SAFE`, `SYM`, `ACC`, `DEB`: as in `SinkhornParameters`.
 """
-struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
+struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}
     V1::SinkhornVariable{T,d,AT,VT} #X, α, log(α), f, f₋, h, h₋
     V2::SinkhornVariable{T,d,AT,VT}
-    CC::CostCollection{T,CT}        #C_xy, C_yx, C_xx, C_yy
+    CC::CostCollection{T,CT,KT}     #C_xy, C_yx, C_xx, C_yy
     params::SinkhornParameters{SAFE, SYM, ACC, DEB, T}
 
     function SinkhornDivergence(V::SinkhornVariable{T,d,AT,VT}, 
                                 W::SinkhornVariable{T,d,AT,VT}, 
-                                CC::CostCollection{T,CT}, 
+                                CC::CostCollection{T,CT, KT}, 
                                 params::SinkhornParameters{SAFE, SYM, ACC, DEB, T};
                                 islog = true,
-                                islowrank = false) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT}
-        new{islog, SAFE, SYM, ACC, DEB, islowrank, T, d, AT, VT, CT}(V, W, CC, params)
+                                islowrank = false) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT, KT}
+        new{islog, SAFE, SYM, ACC, DEB, islowrank, T, d, AT, VT, CT, KT}(V, W, CC, params)
     end
 end
 
@@ -104,13 +104,13 @@ end
     - `ε::T`: scaling parameter.
 
 """
-function softmin(j, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::T) where T
-    M = -Inf
-    r = 0.0
+function softmin(j::Int, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::T) where T
+    M::T = -Inf
+    r::T = 0
     # this is serial for now 
     @inbounds for i in eachindex(f)
         v = (f[i] - C[i,j])/ε + log_α[i]
-        if v <= M
+        if v ≤ M
             r += exp(v-M)
         else
             r *= exp(M-v)
@@ -389,9 +389,10 @@ end
 """
 function value(S::LogSinkhornDivergence)
     if isdebiased(S)
-        return (S.V1.f .- S.V1.h)' * S.V1.α + (S.V2.f .- S.V2.h)' * S.V2.α
+        # return (S.V1.f .- S.V1.h) ⋅ S.V1.α + (S.V2.f .- S.V2.h) ⋅ S.V2.α
+        return (S.V1.f ⋅ S.V1.α - S.V1.h ⋅ S.V1.α) + (S.V2.f ⋅ S.V2.α - S.V2.h ⋅ S.V2.α)
     else
-        return S.V1.f' * S.V1.α + S.V2.f' * S.V2.α
+        return S.V1.f ⋅ S.V1.α + S.V2.f ⋅ S.V2.α
     end
 end
 
@@ -427,13 +428,13 @@ function x_gradient!(S::LogSinkhornDivergence, ∇c)
         # W(α,β) term
         for j in eachindex(g)
             v = exp((g[j] + f[i] - S.CC.C_xy[i,j])/ε) * S.V2.α[j]
-            ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:])
+            @views ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:])
         end
         # W(α,α) term
         if isdebiased(S)
             for k in eachindex(S.V1.h)
                 v = exp((S.V1.h[k] + S.V1.h[i] - S.CC.C_xx[i,k])/ε) * S.V1.α[k]
-                ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
+                @views ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
             end
         end
     end
@@ -452,13 +453,13 @@ function x_gradient!(S::NologSinkhornDivergence, ∇c)
         # W(α,β) term
         for j in eachindex(g)
             v = g[j] * f[i] * S.CC.K_xy[i,j] / S.V1.α[i]
-            ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:])
+            @views ∇S[i,:] .+= v .* ∇c(X[i,:],Y[j,:])
         end
         # W(α,α) term
         if isdebiased(S)
             for k in eachindex(S.V1.h)
                 v = S.V1.h[k] * S.V1.h[i] * S.CC.K_xx[i,k] / S.V1.α[i]
-                ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
+                @views ∇S[i,:] .-= v .* ∇c(X[i,:],X[k,:])
             end
         end
     end
@@ -488,13 +489,13 @@ function y_gradient!(S::LogSinkhornDivergence, ∇c)
         # W(α,β) term
         for i in eachindex(f)
             v = exp((g[j] + f[i] - S.CC.C_yx[j,i])/ε) * S.V1.α[i]
-            ∇S[j,:] .+= v .* ∇c(Y[j,:],X[i,:])
+            @views ∇S[j,:] .+= v .* ∇c(Y[j,:],X[i,:])
         end
         # W(β,β) term
         if isdebiased(S)
             for k in eachindex(S.V2.h)
                 v = exp((S.V2.h[k] + S.V2.h[j] - S.CC.C_yy[j,k])/ε) * S.V2.α[k]
-                ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:])
+                @views ∇S[j,:] .-= v .* ∇c(Y[j,:],Y[k,:])
             end
         end
     end
