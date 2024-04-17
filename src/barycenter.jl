@@ -14,21 +14,21 @@
     Type parameters:
     - `LOG, SAFE, SYM, ACC`: As in `SinkhornDivergence` and in fact identical to those values of the contained `SinkhornDivergence` objects.
 """
-struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
+struct SinkhornBarycenter{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}
     ω::Vector{T}
-    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}}
+    Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}}
     ∇c
     max_it::Int
     tol::T
     δX::AT
 
     function SinkhornBarycenter(ω::Vector{T},
-                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}},
+                                Ss::Vector{SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}},
                                 ∇c,
                                 max_it::Int,
                                 tol::T,
-                                δX::AT) where {LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
-        new{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}(ω, Ss, ∇c, max_it, tol, δX)
+                                δX::AT) where {LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}
+        new{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}(ω, Ss, ∇c, max_it, tol, δX)
     end
 end
 
