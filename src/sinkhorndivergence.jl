@@ -110,7 +110,7 @@ function softmin(j::Int, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::Abs
     # this is serial for now 
     @inbounds for i in eachindex(f)
         v = (f[i] - C[i,j])/ε + log_α[i]
-        if v <= M
+        if v ≤ M
             r += exp(v-M)
         else
             r *= exp(M-v)

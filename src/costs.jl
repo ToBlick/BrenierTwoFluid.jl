@@ -19,7 +19,7 @@ struct LazyCost{T, d, AT <: AbstractArray{T,d}, FT <: Base.Callable} <: Abstract
 end
 
 Base.getindex(C::LazyCost{T,1}, i, j) where {T} = C.c(C.x[i], C.y[j])::T
-Base.getindex(C::LazyCost{T}, i, j) where {T} = @views C.c(C.x[i,:], C.y[j,:])::T
+Base.getindex(C::LazyCost{T}, i, j) where {T} = (C.c(@view(C.x[i,:]), @view(C.y[j,:])))::T
 Base.size(C::LazyCost) = (size(C.x,1), size(C.y,1))
 
 """
@@ -31,18 +31,14 @@ Base.size(C::LazyCost) = (size(C.x,1), size(C.y,1))
     - `C::LazyCost`: N × M `LazyCost` matrix.
     - `ε::Base.RefValue`: reference of the Gibbs kernel scale.
 """
-struct LazyGibbsKernel{T, CT <: AbstractMatrix{T}} <: AbstractMatrix{T}
+mutable struct LazyGibbsKernel{T, CT <: AbstractMatrix{T}} <: AbstractMatrix{T}
     C::CT
-    ε::Base.RefValue{T} # mutable
+    ε::T # mutable
 end
 
-function LazyGibbsKernel(C::LazyCost{T}, ε::T) where {T}
-    LazyGibbsKernel(C, Ref(ε))
-end
-
-scale(K::LazyGibbsKernel{T}) where T = K.ε[]::T
+scale(K::LazyGibbsKernel{T}) where T = K.ε::T
 function set_scale!(K::LazyGibbsKernel{T}, ε::T) where T
-    K.ε[] = ε
+    K.ε = ε
 end
 Base.getindex(K::LazyGibbsKernel{T}, i, j) where {T} = exp(-K.C[i,j]/scale(K))::T
 Base.size(K::LazyGibbsKernel) = size(K.C)
@@ -70,16 +66,20 @@ struct CostCollection{T, CT <: AbstractMatrix{T}, KT <: AbstractMatrix{T}}
     K_yy::KT    # typically lazy Gibbs kernels
 end
 
-function CostCollection(X::AT, Y::AT, c::FT, ε) where {T, AT <: AbstractArray{T}, FT <: Base.Callable}
+function CostCollection(X::AT, Y::AT, c::Base.Callable, ε) where {T, AT <: AbstractArray{T}}
     C_xy = LazyCost(X,Y,c)
     C_yx = LazyCost(Y,X,c)
     C_xx = LazyCost(X,X,c)
     C_yy = LazyCost(Y,Y,c)
 
+    @assert typeof(C_xy) == typeof(C_yx) == typeof(C_xx) == typeof(C_yy)
+
     K_xy = LazyGibbsKernel(C_xy, ε)
     K_yx = LazyGibbsKernel(C_yx, ε)
     K_xx = LazyGibbsKernel(C_xx, ε)
     K_yy = LazyGibbsKernel(C_yy, ε)
+
+    @assert typeof(K_xy) == typeof(K_yx) == typeof(K_xx) == typeof(K_yy)
 
     CostCollection( C_xy, C_yx, C_xx, C_yy, K_xy, K_yx, K_xx, K_yy )
 end
