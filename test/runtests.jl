@@ -1,12 +1,6 @@
-using BrenierTwoFluid
-using Test
-using Distances
-using Random
-using LinearAlgebra
+using SafeTestsets
 
-@testset "BrenierTwoFluid.jl" begin
-    include("costtests.jl")
-    include("distancetests.jl")
-    #include("gradienttests.jl")
-    include("barycentertests.jl")
-end
+@safetestset "Costs                                                                           " begin include("costtests.jl") end
+@safetestset "Distances                                                                       " begin include("distancetests.jl") end
+# @safetestset "Gradients                                                                       " begin include("gradienttests.jl") end
+@safetestset "Barycenters                                                                     " begin include("barycentertests.jl") end
