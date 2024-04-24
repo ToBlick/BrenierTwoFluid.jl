@@ -226,7 +226,7 @@ function compute!(S::SafeSinkhornDivergence)
         =#
         # tolerance criterion: update of dual potentials
         if it % tol_it(S) == 0
-            if norm(S.V1.f₋ - S.V1.f) < tol(S) * norm(S.V1.f₋)
+            if euclidean(S.V1.f₋, S.V1.f) < tol(S) * norm(S.V1.f₋)
                 break
             end
         end
