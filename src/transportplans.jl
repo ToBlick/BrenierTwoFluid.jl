@@ -1,12 +1,12 @@
-struct TransportPlan{T, d, AT <: AbstractArray{T,d}, VT <: AbstractVector{T}, CT <: AbstractMatrix{T}}
+struct TransportPlan{T, PLT <: ParticleList{T}, CT <: AbstractMatrix{T}}
     Mat::Matrix{T}
-    V1::SinkhornVariable{T,d,AT,VT}
-    V2::SinkhornVariable{T,d,AT,VT}
+    V1::SinkhornVariable{T,PLT}
+    V2::SinkhornVariable{T,PLT}
     C::CT
     ε::T
 end
 
-function TransportPlan(S::SinkhornDivergence{LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}) where {LOG, SAFE, SYM, ACC, T, d, AT, VT, CT}
+function TransportPlan(S::SinkhornDivergence)
     TransportPlan(transportmatrix(S),S.V1,S.V2,S.CC.C_xy,scale(S))
 end
 

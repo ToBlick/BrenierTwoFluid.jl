@@ -14,19 +14,19 @@
     - `SAFE`, `SYM`, `ACC`, `DEB`: as in `SinkhornParameters`.
     Default: log = anything, safe = true, sym = false, acc = anything, deb = true, lowrank = false
 """
-struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT, KT}
-    V1::SinkhornVariable{T,d,AT,VT} #X, α, log(α), f, f₋, h, h₋
-    V2::SinkhornVariable{T,d,AT,VT}
+struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, PLT, CT, KT}
+    V1::SinkhornVariable{T,PLT} #X, α, log(α), f, f₋, h, h₋
+    V2::SinkhornVariable{T,PLT}
     CC::CostCollection{T,CT,KT}     #C_xy, C_yx, C_xx, C_yy
     params::SinkhornParameters{SAFE, SYM, ACC, DEB, T}
 
-    function SinkhornDivergence(V::SinkhornVariable{T,d,AT,VT}, 
-                                W::SinkhornVariable{T,d,AT,VT}, 
+    function SinkhornDivergence(V::SinkhornVariable{T,PLT}, 
+                                W::SinkhornVariable{T,PLT}, 
                                 CC::CostCollection{T,CT, KT}, 
                                 params::SinkhornParameters{SAFE, SYM, ACC, DEB, T};
                                 islog = true,
-                                islowrank = false) where {SAFE, SYM, ACC, DEB, T, d, AT, VT, CT, KT}
-        new{islog, SAFE, SYM, ACC, DEB, islowrank, T, d, AT, VT, CT, KT}(V, W, CC, params)
+                                islowrank = false) where {SAFE, SYM, ACC, DEB, T, PLT, CT, KT}
+        new{islog, SAFE, SYM, ACC, DEB, islowrank, T, PLT, CT, KT}(V, W, CC, params)
     end
 end
 
@@ -100,16 +100,16 @@ end
     Arguments:
     - `j::Int`: index of the column of `C` we are interested in.
     - `C::AbstractMatrix{T}`: cost matrix.
-    - `f::AbstractVector{T}`: dual potential.
-    - `log_α::AbstractVector{T}`: logarithm of the weights.
+    - `f::AbstractArray{T}`: dual potential.
+    - `log_α::AbstractArray{T}`: logarithm of the weights.
     - `ε::T`: scaling parameter.
 
 """
-function softmin(j::Int, C::AbstractMatrix{T}, f::AbstractVector{T}, log_α::AbstractVector{T}, ε::T) where T
+function softmin(j::Int, C::AbstractMatrix{T}, f::AbstractArray{T}, log_α::AbstractArray{T}, ε::T) where T
     M::T = -Inf
     r::T = 0
     # this is serial for now 
-    @inbounds for i in eachindex(f)
+    @inbounds for i in eachindex(f,log_α)
         v = (f[i] - C[i,j])/ε + log_α[i]
         if v ≤ M
             r += exp(v-M)

@@ -2,6 +2,7 @@ module BrenierTwoFluid
 
 using Distances
 using Base.Threads
+using ParticleMethods
 using Plots
 using LaTeXStrings
 using LinearAlgebra

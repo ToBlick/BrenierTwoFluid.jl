@@ -36,6 +36,7 @@ set_scale!(S, 0.5)
 @test norm( exp.(-S.CC.C_xy ./ 0.5) - S.CC.K_xy) < 1e-12
 
 X .-= 1.0
+S.V1.X .-= 1
 
 C_naive = 0.5 * [ norm(X[i,:] - Y[j,:])^2 for i in 1:N, j in 1:M ];
 norm_C = norm(C_naive)

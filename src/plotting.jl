@@ -1,4 +1,4 @@
-function Plots.plot(Π::TransportPlan{T,2}) where {T}
+function Plots.plot(Π::TransportPlan{T}) where {T}
     X = Π.V1.X
     Y = Π.V2.X
     α = Π.V1.α

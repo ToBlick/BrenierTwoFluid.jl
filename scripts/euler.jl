@@ -15,8 +15,8 @@ const DOMAIN = (1.0, 1.0)   # only cubes for now
 const c = (x,y) -> 0.5 * sqeuclidean(x,y) # c_periodic(x,y,DOMAIN)
 const ∇c = (x,y) -> x-y # ∇c_periodic(x,y,DOMAIN)
 
-const N = 40^2
-const M = 40^2
+const N = 30^2
+const M = 30^2
 
 const T = 1.0               # final time
 
@@ -72,16 +72,16 @@ function run_euler(path)
     β = ones(M) / M
     hN = 1/sqrt(N)
     hM = 1/sqrt(M)
-    X = stack(vec([ [x,y] for x in range(-DOMAIN[1]/2+hN/2,DOMAIN[1]/2-hN/2,length=Int(sqrt(N))), 
-                              y in range(-DOMAIN[2]/2+hN/2,DOMAIN[2]/2-hN/2,length=Int(sqrt(N))) ]), dims = 1)
-    Y = stack(vec([ [x,y] for x in range(-DOMAIN[1]/2+hM/2,DOMAIN[1]/2-hM/2,length=Int(sqrt(M))), 
-                              y in range(-DOMAIN[2]/2+hM/2,DOMAIN[2]/2-hM/2,length=Int(sqrt(M))) ]), dims = 1)
-    X_ON_GRID ? nothing : X = rand(N,d) .- 0.5
-    Y_ON_GRID ? nothing : Y = rand(M,d) .- 0.5
+    X₀ = stack(vec([ [x,y] for x in range(-DOMAIN[1]/2+hN/2,DOMAIN[1]/2-hN/2,length=Int(sqrt(N))), 
+                               y in range(-DOMAIN[2]/2+hN/2,DOMAIN[2]/2-hN/2,length=Int(sqrt(N))) ]), dims = 1)
+    Y₀ = stack(vec([ [x,y] for x in range(-DOMAIN[1]/2+hM/2,DOMAIN[1]/2-hM/2,length=Int(sqrt(M))), 
+                               y in range(-DOMAIN[2]/2+hM/2,DOMAIN[2]/2-hM/2,length=Int(sqrt(M))) ]), dims = 1)
+    X_ON_GRID ? nothing : X₀ = rand(N,d) .- 0.5
+    Y_ON_GRID ? nothing : Y₀ = rand(M,d) .- 0.5
 
     # initial velocity
-    V = zero(X)
-    for i in axes(X)[1] V[i,:] .= u0(X[i,:]) end
+    V₀ = zero(X₀)
+    for i in axes(X₀)[1] V₀[i,:] .= u0(X₀[i,:]) end
 
     # Setup Sinkhorn
     params = SinkhornParameters(ε=ENTROPIC_REG,
@@ -99,13 +99,17 @@ function run_euler(path)
                                 deb=DEB,
                                 safe=SAFE,
                                 );
-    S = SinkhornDivergence(SinkhornVariable(X, α),
-                           SinkhornVariable(Y, β),
+    S = SinkhornDivergence(SinkhornVariable(X₀, α),
+                           SinkhornVariable(Y₀, β),
                            c,
                            params;
                            islog = LOG)
     initialize_potentials!(S)
     compute!(S)
+
+    X = S.V1.X
+    V = S.V1.V
+    Y = S.V2.X
           
     t = 0
     Δt = DELTA_T
