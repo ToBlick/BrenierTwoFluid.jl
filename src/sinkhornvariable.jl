@@ -75,21 +75,21 @@ function initialize_potentials_nolog!(V1::SinkhornVariable, V2::SinkhornVariable
     V1.h₋  .= V1.α # V1.h
     V2.h   .= V2.α # CC.C_yy * V2.α
     V2.h₋  .= V2.α # V2.h
-    V1.∇fh .= 0.0
-    V2.∇fh .= 0.0
+    V1.∇fh .= 0
+    V2.∇fh .= 0
     # the latter are good for entropic OT with large ε.
 end
 
 function initialize_potentials_log!(V1::SinkhornVariable, V2::SinkhornVariable, CC::CostCollection)
-    V1.f   .= 0.0 # CC.C_xy * V2.α
-    V1.f₋  .= 0.0 # V1.f
-    V2.f   .= 0.0 # CC.C_yx * V1.α
-    V2.f₋  .= 0.0 # V2.f
-    V1.h   .= 0.0 # CC.C_xx * V1.α
-    V1.h₋  .= 0.0 # V1.h
-    V2.h   .= 0.0 # CC.C_yy * V2.α
-    V2.h₋  .= 0.0 # V2.h
-    V1.∇fh .= 0.0
-    V2.∇fh .= 0.0
+    V1.f   .= 0 # CC.C_xy * V2.α
+    V1.f₋  .= 0 # V1.f
+    V2.f   .= 0 # CC.C_yx * V1.α
+    V2.f₋  .= 0 # V2.f
+    V1.h   .= 0 # CC.C_xx * V1.α
+    V1.h₋  .= 0 # V1.h
+    V2.h   .= 0 # CC.C_yy * V2.α
+    V2.h₋  .= 0 # V2.h
+    V1.∇fh .= 0
+    V2.∇fh .= 0
     # the latter are good for entropic OT with large ε.
 end
