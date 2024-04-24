@@ -19,7 +19,7 @@ struct SinkhornVariable{T, PLT <: ParticleList{T}}
     function SinkhornVariable(X::AT, α::VT, log_α::VT, f::VT, f₋::VT, h::VT, h₋::VT, ∇fh::AT) where {T, AT <: AbstractArray{T}, VT <: AbstractVector{T}}
         x = hcat(X, zero(X), α, log_α, f, f₋, h, h₋, ∇fh)
         dim = size(X, 2)
-        pl = ParticleList(transpose(x); variables = (
+        pl = ParticleList(collect(transpose(x)); variables = (
             X =     1:dim,
             V =     dim+1:2dim,
             α =     2dim+1,
@@ -52,12 +52,12 @@ end
     hasfield(PLT, s) || hasfield(SinkhornVariable, s)
 end
 
-_transpose(a::AbstractArray) = transpose(a)
-_transpose(a::AbstractVector) = a
+@inline _transpose(a::AbstractArray) = transpose(a)
+@inline _transpose(a::AbstractVector) = a
 
 @inline function Base.getproperty(sv::SinkhornVariable{T,PLT}, s::Symbol) where {T, ST, VT, PLT <: ParticleList{T, ST, VT}}
     if hasfield(VT, s)
-        return _transpose(getfield(sv.pl, :views)[s])
+        return _transpose(getfield(getfield(sv, :pl), :views)[s])
     elseif hasfield(PLT, s)
         return getfield(sv, :pl)[s]
     else
