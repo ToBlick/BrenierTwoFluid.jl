@@ -1,27 +1,38 @@
 name: Documentation
-
 on:
   push:
     branches:
       - main
+    tags: '*'
   pull_request:
-
 jobs:
-  build:
+  docs:
     name: Documentation
-    permissions: write-all
     runs-on: ubuntu-latest
+    permissions:
+      actions: write # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      contents: write
+      statuses: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: julia-actions/setup-julia@latest
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v1
         with:
           version: '1'
-      - name: Install dependencies
-        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(url="https://github.com/ToBlick/BrenierTwoFluid.jl"); Pkg.instantiate();'
-      - run: |
-          julia --project=docs docs/make.jl html_output
+      - uses: julia-actions/cache@v1
+      - name: Configure doc environment
+        shell: julia --project=docs --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.develop(PackageSpec(path=pwd()))
+          Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-docdeploy@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+      - run: |
+          julia --project=docs -e '
+            using Documenter: DocMeta, doctest
+            using BrenierTwoFluid
+            DocMeta.setdocmeta!(BrenierTwoFluid, :DocTestSetup, :(using BrenierTwoFluid); recursive=true)
+            doctest(BrenierTwoFluid)'
