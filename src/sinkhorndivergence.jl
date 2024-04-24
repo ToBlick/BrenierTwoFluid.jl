@@ -12,6 +12,7 @@
     Type parameters:
     - `LOG`: whether or not the Sinkhorn algorithm is performed in the log domain.
     - `SAFE`, `SYM`, `ACC`, `DEB`: as in `SinkhornParameters`.
+    Default: log = anything, safe = true, sym = false, acc = anything, deb = true, lowrank = false
 """
 struct SinkhornDivergence{LOG, SAFE, SYM, ACC, DEB, LR, T, d, AT, VT, CT}
     V1::SinkhornVariable{T,d,AT,VT} #X, α, log(α), f, f₋, h, h₋

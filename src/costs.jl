@@ -100,14 +100,14 @@ end
     # Arguments
     - `x::VT`: N × d `AbstractVector` of points.
     - `y::VT`: M × d `AbstractVector` of points.
-    - `D::VT`: d `AbstractVector` of periodicity.
+    - `D::VT`: d `AbstractVector` of the length of the domain box in every dimension.
 
     # Returns
     - `d::T`: Scalar cost.
 """
 
 function c_periodic(x::VT,y::VT,D) where {T,VT <: AbstractVector{T}}
-    d = 0
+    d = zero(T)
     for i in eachindex(x)
         if x[i] - y[i] > D[i]/2
             d += (x[i] - y[i] - D[i])^2
@@ -135,8 +135,8 @@ function ∇c_periodic(x,y,D)
 end
 
 function c_periodic_x(x::VT,y::VT,D) where {T,VT <: AbstractVector{T}}
-    d = 0
-    for i in [1]
+    d = zero(T)
+    @simd for i in [1]
         if x[i] - y[i] > D[i]/2
             d += (x[i] - y[i] - D[i])^2
         elseif x[i] - y[i] < -D[i]/2

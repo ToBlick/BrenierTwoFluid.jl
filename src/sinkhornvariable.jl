@@ -12,7 +12,6 @@
     - `h::VT`: transport potential for the de-biasing step.
     - `h₋::VT`: cache-like array to store the previous value of `h`.
     - `∇fh::AT`: gradient of `f+h` evaluated at `X`.
-
 """
 struct SinkhornVariable{T, d, AT <: AbstractArray{T,d}, VT <: AbstractVector{T}}
     X::AT
