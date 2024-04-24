@@ -6,6 +6,9 @@ using Random
 using LinearAlgebra
 using Plots
 
+const dotime = false
+# const dotime = true
+
 c = (x,y) -> 0.5 * sqeuclidean(x,y)
 ∇c = (x,y) -> x - y
 d = 2
@@ -35,7 +38,7 @@ params = SinkhornParameters(ε=ε,tol=tol,sym=false,acc=true);
 ω = [0.5, 0.5];
 B = SinkhornBarycenter(ω, [ SinkhornDivergence(Vμ, V_vec[i], c, params, islog=true) for i in eachindex(V_vec) ], ∇c, 10, 1e-3, zero(Z));
 
-@time compute!(B)
+dotime ? @time(compute!(B)) : compute!(B)
 
 Vμ = SinkhornVariable(Z, μ);
 Vμ_true = SinkhornVariable(Z_true, μ);
